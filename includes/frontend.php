@@ -1,0 +1,320 @@
+<?php
+/**
+ * Frontend: content injection, rendering, shortcode, styles.
+ *
+ * @package EcoCTA
+ * @since   1.3.0
+ */
+
+declare( strict_types=1 );
+
+namespace EcoCTA\Frontend;
+
+use function EcoCTA\Helpers\get_settings;
+
+add_filter( 'the_content', __NAMESPACE__ . '\\inject', 20 );
+add_action( 'wp_head', __NAMESPACE__ . '\\print_styles' );
+add_shortcode( 'eco_cta', __NAMESPACE__ . '\\shortcode' );
+
+/* ─────────────────────────────────────────────
+   Content injection
+───────────────────────────────────────────── */
+
+/**
+ * Inject the matching CTA into the post content.
+ *
+ * Runs at priority 20 to let shortcodes and embeds process first.
+ */
+function inject( string $content ): string {
+    if ( is_admin() || ! in_the_loop() || ! is_main_query() ) {
+        return $content;
+    }
+
+    $settings = get_settings();
+
+    if ( empty( $settings['enabled'] ) || empty( $settings['ctas'] ) ) {
+        return $content;
+    }
+
+    $current_type = (string) get_post_type();
+
+    if ( ! in_array( $current_type, $settings['post_types'], true ) ) {
+        return $content;
+    }
+
+    if ( ! is_singular( $settings['post_types'] ) ) {
+        return $content;
+    }
+
+    $cta = match_cta( $settings['ctas'], $current_type );
+
+    if ( null === $cta ) {
+        return $content;
+    }
+
+    $html     = render( $cta );
+    $position = $cta['position'] ?? 'inline';
+
+    return match ( $position ) {
+        'inline' => insert_after_paragraph( $content, $html, $settings['insert_after_paragraph'] ),
+        'end'    => $content . $html,
+        'both'   => insert_after_paragraph( $content, $html, $settings['insert_after_paragraph'] ) . $html,
+        default  => $content . $html,
+    };
+}
+
+/* ─────────────────────────────────────────────
+   Matching engine
+───────────────────────────────────────────── */
+
+/**
+ * Find the best matching CTA using priority:
+ *   1. post_type + taxonomy term  (most specific)
+ *   2. taxonomy term only
+ *   3. post_type only
+ *   4. global fallback  (no filters)
+ *
+ * @param array<int, array<string, mixed>> $ctas         Configured CTAs.
+ * @param string                           $current_type Current post type slug.
+ * @return array<string, mixed>|null
+ */
+function match_cta( array $ctas, string $current_type ): ?array {
+    $post_terms = get_post_terms_indexed( (int) get_the_ID() );
+
+    // Priority 1 — post_type + taxonomy term.
+    foreach ( $ctas as $cta ) {
+        if (
+            ! empty( $cta['post_type'] ) && $cta['post_type'] === $current_type
+            && ! empty( $cta['taxonomy'] ) && ! empty( $cta['term_id'] )
+            && has_term( $post_terms, $cta['taxonomy'], (int) $cta['term_id'] )
+        ) {
+            return $cta;
+        }
+    }
+
+    // Priority 2 — taxonomy term only.
+    foreach ( $ctas as $cta ) {
+        if (
+            empty( $cta['post_type'] )
+            && ! empty( $cta['taxonomy'] ) && ! empty( $cta['term_id'] )
+            && has_term( $post_terms, $cta['taxonomy'], (int) $cta['term_id'] )
+        ) {
+            return $cta;
+        }
+    }
+
+    // Priority 3 — post_type only.
+    foreach ( $ctas as $cta ) {
+        if (
+            ! empty( $cta['post_type'] ) && $cta['post_type'] === $current_type
+            && empty( $cta['taxonomy'] ) && empty( $cta['term_id'] )
+        ) {
+            return $cta;
+        }
+    }
+
+    // Priority 4 — global fallback.
+    foreach ( $ctas as $cta ) {
+        if ( empty( $cta['post_type'] ) && empty( $cta['taxonomy'] ) && empty( $cta['term_id'] ) ) {
+            return $cta;
+        }
+    }
+
+    return null;
+}
+
+/**
+ * Build an indexed array of term IDs keyed by taxonomy for the given post.
+ *
+ * @param int $post_id Post ID.
+ * @return array<string, int[]>
+ */
+function get_post_terms_indexed( int $post_id ): array {
+    $result     = [];
+    $taxonomies = get_object_taxonomies( (string) get_post_type( $post_id ), 'names' );
+
+    foreach ( $taxonomies as $tax ) {
+        $terms = wp_get_post_terms( $post_id, $tax, [ 'fields' => 'ids' ] );
+        if ( ! is_wp_error( $terms ) ) {
+            $result[ $tax ] = $terms;
+        }
+    }
+
+    return $result;
+}
+
+/**
+ * Check whether the indexed terms contain a specific taxonomy:term_id pair.
+ *
+ * @param array<string, int[]> $post_terms Indexed terms.
+ * @param string               $taxonomy   Taxonomy slug.
+ * @param int                  $term_id    Term ID.
+ */
+function has_term( array $post_terms, string $taxonomy, int $term_id ): bool {
+    return isset( $post_terms[ $taxonomy ] ) && in_array( $term_id, $post_terms[ $taxonomy ], true );
+}
+
+/* ─────────────────────────────────────────────
+   Paragraph insertion
+───────────────────────────────────────────── */
+
+/**
+ * Insert HTML after the Nth closing </p> tag.
+ *
+ * Falls back to appending at the end when the content has fewer paragraphs.
+ *
+ * @param string $content   Post HTML.
+ * @param string $injection CTA HTML.
+ * @param int    $after     Paragraph number (1-based).
+ */
+function insert_after_paragraph( string $content, string $injection, int $after ): string {
+    $parts = explode( '</p>', $content );
+    $total = count( $parts );
+
+    if ( $total <= 1 ) {
+        return $content . $injection;
+    }
+
+    $insert_at = min( $after, $total - 1 );
+    $output    = '';
+
+    for ( $i = 0; $i < $total; $i++ ) {
+        $output .= $parts[ $i ];
+
+        if ( $i < $total - 1 ) {
+            $output .= '</p>';
+        }
+
+        if ( $i === $insert_at - 1 ) {
+            $output .= $injection;
+        }
+    }
+
+    return $output;
+}
+
+/* ─────────────────────────────────────────────
+   Render CTA block
+───────────────────────────────────────────── */
+
+/**
+ * Render a single CTA block.
+ *
+ * @param array<string, mixed> $cta CTA data.
+ * @return string HTML.
+ */
+function render( array $cta ): string {
+    $accent = esc_attr( $cta['accent_color'] ?? '#FF6B35' );
+    $title  = esc_html( $cta['title'] ?? '' );
+    $text   = esc_html( $cta['text'] ?? '' );
+    $label  = esc_html( $cta['button_label'] ?: __( 'Learn more', 'eco-cta' ) );
+    $url    = esc_url( $cta['button_url'] ?? '#' );
+
+    $icon = match ( $cta['button_type'] ?? 'link' ) {
+        'newsletter' => '📧',
+        'community'  => '👥',
+        default      => '→',
+    };
+
+    $html = '<div class="eco-cta-block" style="--eco-accent:' . $accent . '">';
+
+    if ( $title ) {
+        $html .= '<p class="eco-cta-title">' . $title . '</p>';
+    }
+    if ( $text ) {
+        $html .= '<p class="eco-cta-text">' . $text . '</p>';
+    }
+
+    $html .= '<a class="eco-cta-btn" href="' . $url . '" target="_blank" rel="noopener">'
+           . $icon . ' ' . $label
+           . '</a></div>';
+
+    return $html;
+}
+
+/* ─────────────────────────────────────────────
+   Frontend styles
+───────────────────────────────────────────── */
+
+function print_styles(): void {
+    $settings = get_settings();
+
+    if ( empty( $settings['enabled'] ) || empty( $settings['ctas'] ) ) {
+        return;
+    }
+
+    if ( ! is_singular( $settings['post_types'] ) ) {
+        return;
+    }
+
+    ?>
+    <style id="eco-cta-styles">
+    .eco-cta-block{--eco-accent:#FF6B35;border-left:4px solid var(--eco-accent);background:#f9f9f9;padding:16px 20px;margin:28px 0;border-radius:0 6px 6px 0;font-family:inherit}
+    .eco-cta-title{font-weight:700;font-size:1.05em;margin:0 0 6px;color:#111}
+    .eco-cta-text{margin:0 0 12px;color:#444;font-size:.95em;line-height:1.5}
+    .eco-cta-btn{display:inline-block;background:var(--eco-accent);color:#fff!important;padding:8px 18px;border-radius:4px;text-decoration:none!important;font-weight:600;font-size:.9em;transition:opacity .2s}
+    .eco-cta-btn:hover{opacity:.85}
+    @media(max-width:600px){.eco-cta-btn{display:block;text-align:center}}
+    </style>
+    <?php
+}
+
+/* ─────────────────────────────────────────────
+   Shortcode  [eco_cta post_type="..." taxonomy="..." term="..." category="..."]
+───────────────────────────────────────────── */
+
+/**
+ * Render a CTA via shortcode. Accepts:
+ *   - category="16"                    (legacy, maps to taxonomy=category)
+ *   - post_type="glosario"
+ *   - taxonomy="category" term="16"
+ *
+ * @param array<string, string>|string $atts Shortcode attributes.
+ * @return string HTML.
+ */
+function shortcode( array|string $atts ): string {
+    $atts = shortcode_atts( [
+        'post_type' => '',
+        'taxonomy'  => '',
+        'term'      => 0,
+        'category'  => 0,   // Legacy compat.
+    ], $atts, 'eco_cta' );
+
+    $settings = get_settings();
+
+    if ( empty( $settings['ctas'] ) ) {
+        return '';
+    }
+
+    // Legacy: category="X" → taxonomy=category, term=X.
+    if ( ! empty( $atts['category'] ) && empty( $atts['taxonomy'] ) ) {
+        $atts['taxonomy'] = 'category';
+        $atts['term']     = (int) $atts['category'];
+    }
+
+    $target_pt   = sanitize_key( $atts['post_type'] );
+    $target_tax  = sanitize_key( $atts['taxonomy'] );
+    $target_term = (int) $atts['term'];
+
+    // Find best matching CTA.
+    foreach ( $settings['ctas'] as $c ) {
+        $match_pt  = empty( $target_pt ) || ( ! empty( $c['post_type'] ) && $c['post_type'] === $target_pt );
+        $match_tax = empty( $target_tax ) || (
+            ! empty( $c['taxonomy'] ) && $c['taxonomy'] === $target_tax
+            && (int) $c['term_id'] === $target_term
+        );
+
+        if ( $match_pt && $match_tax ) {
+            return render( $c );
+        }
+    }
+
+    // Fallback global.
+    foreach ( $settings['ctas'] as $c ) {
+        if ( empty( $c['post_type'] ) && empty( $c['taxonomy'] ) && empty( $c['term_id'] ) ) {
+            return render( $c );
+        }
+    }
+
+    return '';
+}
