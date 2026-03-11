@@ -10,6 +10,10 @@ declare( strict_types=1 );
 
 namespace LeanCTAs\Helpers;
 
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
+
 use const LeanCTAs\OPTION_KEY;
 
 /**
@@ -31,7 +35,7 @@ function defaults(): array {
  *
  * @return array<string, mixed>
  */
-function get_settings(): array {
+function get_plugin_settings(): array {
     return wp_parse_args(
         get_option( OPTION_KEY, [] ),
         defaults()

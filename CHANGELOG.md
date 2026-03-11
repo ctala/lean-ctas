@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.1] - 2026-03-11
+
+### Fixed
+- Added `ABSPATH` direct access protection to all include files
+- Renamed `get_settings()` to `get_plugin_settings()` to avoid collision with deprecated WordPress core function
+- Plugin Check (PCP) now passes with zero errors
+
 ## [2.0.0] - 2026-03-11
 
 ### Changed

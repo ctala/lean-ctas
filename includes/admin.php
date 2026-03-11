@@ -10,7 +10,11 @@ declare( strict_types=1 );
 
 namespace LeanCTAs\Admin;
 
-use function LeanCTAs\Helpers\get_settings;
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
+
+use function LeanCTAs\Helpers\get_plugin_settings;
 use function LeanCTAs\Helpers\get_taxonomy_options;
 use function LeanCTAs\Helpers\cta_defaults;
 
@@ -95,7 +99,7 @@ function render_page(): void {
         return;
     }
 
-    $settings     = get_settings();
+    $settings     = get_plugin_settings();
     $tax_options  = get_taxonomy_options();
     $public_types = get_post_types( [ 'public' => true ], 'objects' );
     unset( $public_types['attachment'] );

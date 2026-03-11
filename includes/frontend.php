@@ -10,7 +10,11 @@ declare( strict_types=1 );
 
 namespace LeanCTAs\Frontend;
 
-use function LeanCTAs\Helpers\get_settings;
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
+
+use function LeanCTAs\Helpers\get_plugin_settings;
 
 add_filter( 'the_content', __NAMESPACE__ . '\\inject', 20 );
 add_action( 'wp_head', __NAMESPACE__ . '\\print_styles' );
@@ -32,7 +36,7 @@ function inject( string $content ): string {
         return $content;
     }
 
-    $settings = get_settings();
+    $settings = get_plugin_settings();
 
     if ( empty( $settings['enabled'] ) || empty( $settings['ctas'] ) ) {
         return $content;
@@ -237,7 +241,7 @@ function render( array $cta ): string {
 ───────────────────────────────────────────── */
 
 function print_styles(): void {
-    $settings = get_settings();
+    $settings = get_plugin_settings();
 
     if ( empty( $settings['enabled'] ) || empty( $settings['ctas'] ) ) {
         return;
@@ -275,7 +279,7 @@ function shortcode( array|string $atts ): string {
         'category'  => 0,
     ], $atts, 'lean_cta' );
 
-    $settings = get_settings();
+    $settings = get_plugin_settings();
 
     if ( empty( $settings['ctas'] ) ) {
         return '';
