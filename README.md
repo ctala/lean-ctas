@@ -97,3 +97,7 @@ Override with CSS custom properties:
 ## License
 
 GPL-2.0-or-later
+
+---
+
+Made with ❤️ from Chile by [cristiantala.com](https://cristiantala.com)
