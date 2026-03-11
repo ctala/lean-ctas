@@ -3,7 +3,7 @@
  * Plugin Name: Eco CTA Plugin
  * Plugin URI:  https://github.com/ctala/eco-cta-plugin
  * Description: Inyecta CTAs dinámicos inline según la categoría del post. Configurable desde el panel de administración.
- * Version:     1.0.0
+ * Version:     1.1.0
  * Author:      Cristian Tala / Nyx
  * Author URI:  https://cristiantala.com
  * License:     GPL-2.0+
@@ -12,7 +12,7 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-define( 'ECO_CTA_VERSION', '1.0.0' );
+define( 'ECO_CTA_VERSION', '1.1.0' );
 define( 'ECO_CTA_OPTION',  'eco_cta_settings' );
 
 /* ─────────────────────────────────────────────
@@ -50,9 +50,11 @@ function eco_cta_sanitize( $input ): array {
     $clean['enabled']                 = ! empty( $input['enabled'] );
     $clean['insert_after_paragraph']  = max( 1, intval( $input['insert_after_paragraph'] ?? 3 ) );
 
+    $valid_positions = [ 'inline', 'end', 'both' ];
     $clean['ctas'] = [];
     if ( ! empty( $input['ctas'] ) && is_array( $input['ctas'] ) ) {
         foreach ( $input['ctas'] as $cta ) {
+            $position = sanitize_key( $cta['position'] ?? 'inline' );
             $clean['ctas'][] = [
                 'category_id'  => intval( $cta['category_id'] ?? 0 ),
                 'title'        => sanitize_text_field( $cta['title'] ?? '' ),
@@ -61,6 +63,7 @@ function eco_cta_sanitize( $input ): array {
                 'button_url'   => esc_url_raw( $cta['button_url'] ?? '' ),
                 'button_type'  => sanitize_key( $cta['button_type'] ?? 'link' ),
                 'accent_color' => sanitize_hex_color( $cta['accent_color'] ?? '#FF6B35' ),
+                'position'     => in_array( $position, $valid_positions ) ? $position : 'inline',
             ];
         }
     }
@@ -163,6 +166,7 @@ function eco_cta_row( $i, array $cta, array $categories ) {
         'button_url'   => '',
         'button_type'  => 'link',
         'accent_color' => '#FF6B35',
+        'position'     => 'inline',
     ];
     $cta = wp_parse_args( $cta, $defaults );
     $n   = ECO_CTA_OPTION . "[ctas][$i]";
@@ -200,6 +204,17 @@ function eco_cta_row( $i, array $cta, array $categories ) {
                     <option value="newsletter"<?= selected( $cta['button_type'], 'newsletter',false ) ?>>📧 Newsletter</option>
                     <option value="community" <?= selected( $cta['button_type'], 'community', false ) ?>>👥 Comunidad</option>
                 </select>
+            </div>
+            <div>
+                <label>Posición</label>
+                <select name="<?= $n ?>[position]">
+                    <option value="inline" <?= selected( $cta['position'], 'inline', false ) ?>>📍 Inline (después del párrafo N)</option>
+                    <option value="end"    <?= selected( $cta['position'], 'end',    false ) ?>>⬇️ Al final del post</option>
+                    <option value="both"   <?= selected( $cta['position'], 'both',   false ) ?>>📍⬇️ Ambos</option>
+                </select>
+                <p class="description" style="font-size:11px;margin-top:4px">
+                    "Ambos" muestra el CTA inline Y al final del post.
+                </p>
             </div>
             <div style="grid-column:span 2">
                 <label>Texto del CTA</label>
@@ -241,8 +256,19 @@ function eco_cta_inject( string $content ): string {
     $cta = eco_cta_match( $settings['ctas'] );
     if ( ! $cta ) return $content;
 
-    $html = eco_cta_render( $cta );
-    return eco_cta_insert_after_paragraph( $content, $html, $settings['insert_after_paragraph'] );
+    $position = $cta['position'] ?? 'inline';
+    $html     = eco_cta_render( $cta );
+
+    if ( $position === 'inline' ) {
+        $content = eco_cta_insert_after_paragraph( $content, $html, $settings['insert_after_paragraph'] );
+    } elseif ( $position === 'end' ) {
+        $content = $content . $html;
+    } elseif ( $position === 'both' ) {
+        $content = eco_cta_insert_after_paragraph( $content, $html, $settings['insert_after_paragraph'] );
+        $content = $content . $html;
+    }
+
+    return $content;
 }
 
 function eco_cta_match( array $ctas ): ?array {
