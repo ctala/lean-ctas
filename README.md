@@ -1,14 +1,14 @@
 # Eco CTA Plugin
 
-Plugin WordPress lean para inyectar CTAs dinámicos dentro del contenido según la categoría del post.
+Plugin WordPress lean para inyectar CTAs dinámicos dentro del contenido según post type, taxonomía o categoría.
 
-**Sin dependencias. Sin bloat. Un archivo PHP.**
+**Sin dependencias. Sin bloat. Un archivo PHP. Funciona con cualquier post type y taxonomía.**
 
 ---
 
 ## ¿Qué hace?
 
-Inserta automáticamente un bloque CTA después del párrafo N de cada post, seleccionando el CTA adecuado según la categoría del post.
+Inserta automáticamente un bloque CTA en posts, páginas, CPTs — donde tú quieras — seleccionando el CTA adecuado según el post type y/o taxonomía.
 
 ```
 [Párrafo 1]
@@ -24,9 +24,10 @@ Inserta automáticamente un bloque CTA después del párrafo N de cada post, sel
 
 ## Casos de uso
 
-- Blog de noticias → diferente CTA para Tecnología, Startups, Fintech
-- Media → newsletter específico por nicho
-- Cualquier site con contenido categorizado que quiera aumentar conversión
+- **Blog de noticias** → diferente CTA para Tecnología, Startups, Fintech
+- **Glosario (CPT)** → CTA de comunidad/newsletter en cada entrada
+- **WooCommerce** → CTA en productos por categoría
+- **Cualquier CPT con taxonomías** → el plugin detecta todo automáticamente
 
 ## Instalación
 
@@ -36,40 +37,42 @@ Inserta automáticamente un bloque CTA después del párrafo N de cada post, sel
 
 ## Configuración
 
-### Panel Admin
+### Panel Admin (Ajustes → Eco CTA)
 
-Ir a **Ajustes → Eco CTA**:
+**Ajustes globales:**
+- **Activado:** Encender/apagar
+- **Post Types habilitados:** Checkboxes para posts, páginas, CPTs
+- **Insertar inline después del párrafo N°:** Posición del CTA inline
 
-- **Activado:** Encender/apagar el plugin
-- **Insertar después del párrafo N°:** Posición del CTA (default: 3)
-- **CTAs por categoría:** Agregar tantos como necesites
-
-### Por cada CTA:
+**Por cada CTA:**
 
 | Campo | Descripción |
 |-------|-------------|
-| Categoría | Qué categoría dispara este CTA. "Todas" = fallback |
+| Post Type | Filtrar por post type específico. Vacío = todos los habilitados |
+| Taxonomía/Término | Filtrar por cualquier taxonomía (categorías, tags, custom). Vacío = sin filtro |
+| Posición | Inline (párrafo N) / Final del post / Ambos |
 | Color de acento | Color del borde y botón |
 | Título | Texto en negrita arriba |
 | Texto | Descripción breve |
 | Tipo de botón | Link / Newsletter / Comunidad |
 | URL | Destino al hacer clic |
 
-### Lógica de matching
+### Lógica de matching (prioridad)
 
-1. Si el post tiene una categoría con CTA configurado → usa ese
-2. Si no hay match específico → usa el CTA con categoría "Todas"
-3. Si no hay ninguno → no inyecta nada
+1. **Post type + término** → match más específico
+2. **Solo término** → match por taxonomía sin importar post type
+3. **Solo post type** → match genérico para ese tipo de contenido
+4. **Fallback global** → CTA sin filtros (aplica a todo)
 
 ### Shortcode
 
-También puedes insertar un CTA manualmente:
-
 ```
-[eco_cta category="16"]
+[eco_cta]                                          <!-- fallback global -->
+[eco_cta category="16"]                            <!-- legacy: categoría WP -->
+[eco_cta post_type="glosario"]                     <!-- por post type -->
+[eco_cta taxonomy="category" term="16"]            <!-- por taxonomía -->
+[eco_cta post_type="product" taxonomy="product_cat" term="42"]  <!-- combo -->
 ```
-
-Donde `16` es el ID de categoría. Sin parámetros usa el CTA fallback.
 
 ## Estructura
 
@@ -80,18 +83,16 @@ eco-cta-plugin/
 
 ## Personalización CSS
 
-El bloque CTA tiene clase `.eco-cta-block` y usa CSS custom properties:
-
 ```css
 .eco-cta-block {
-    --eco-accent: #FF6B35;  /* color de acento */
+    --eco-accent: #FF6B35;  /* cambiar desde admin o CSS del tema */
 }
 ```
 
-Puedes sobrescribir desde tu tema sin modificar el plugin.
-
 ## Roadmap
 
+- [x] Soporte multi post type y taxonomías
+- [x] Posición configurable (inline / final / ambos)
 - [ ] Tracking de clicks (GA4 event / endpoint propio)
 - [ ] Variantes A/B por categoría
 - [ ] Soporte para múltiples CTAs por post (rotación)
