@@ -208,7 +208,8 @@ function insert_after_paragraph( string $content, string $injection, int $after 
  * @return string HTML.
  */
 function render( array $cta ): string {
-    $accent = esc_attr( $cta['accent_color'] ?? '#FF6B35' );
+    $settings = get_plugin_settings();
+    $accent   = esc_attr( $cta['accent_color'] ?: ( $settings['default_color'] ?? '#FF6B35' ) );
     $title  = esc_html( $cta['title'] ?? '' );
     $text   = esc_html( $cta['text'] ?? '' );
     $label  = esc_html( $cta['button_label'] ?: __( 'Learn more', 'lean-ctas' ) );
@@ -253,7 +254,7 @@ function print_styles(): void {
 
     ?>
     <style id="lean-cta-styles">
-    .lean-cta-block{--lean-accent:#FF6B35;border-left:4px solid var(--lean-accent);background:#f9f9f9;padding:16px 20px;margin:28px 0;border-radius:0 6px 6px 0;font-family:inherit}
+    .lean-cta-block{--lean-accent:<?php echo esc_attr( $settings['default_color'] ?? '#FF6B35' ); ?>;border-left:4px solid var(--lean-accent);background:#f9f9f9;padding:16px 20px;margin:28px 0;border-radius:0 6px 6px 0;font-family:inherit}
     .lean-cta-title{font-weight:700;font-size:1.05em;margin:0 0 6px;color:#111}
     .lean-cta-text{margin:0 0 12px;color:#444;font-size:.95em;line-height:1.5}
     .lean-cta-btn{display:inline-block;background:var(--lean-accent);color:#fff!important;padding:8px 18px;border-radius:4px;text-decoration:none!important;font-weight:600;font-size:.9em;transition:opacity .2s}

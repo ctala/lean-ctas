@@ -21,10 +21,13 @@ use const LeanCTAs\OPTION_KEY;
  *
  * @return array<string, mixed>
  */
+const DEFAULT_COLOR = '#FF6B35';
+
 function defaults(): array {
     return [
         'enabled'                => true,
         'insert_after_paragraph' => 3,
+        'default_color'          => DEFAULT_COLOR,
         'post_types'             => [ 'post' ],
         'ctas'                   => [],
     ];
@@ -57,7 +60,7 @@ function cta_defaults(): array {
         'button_label' => '',
         'button_url'   => '',
         'button_type'  => 'link',
-        'accent_color' => '#FF6B35',
+        'accent_color' => '',
         'position'     => 'inline',
     ];
 }
@@ -77,6 +80,7 @@ function sanitize( mixed $input ): array {
 
     $clean['enabled']                = ! empty( $input['enabled'] );
     $clean['insert_after_paragraph'] = max( 1, (int) ( $input['insert_after_paragraph'] ?? 3 ) );
+    $clean['default_color']          = sanitize_hex_color( $input['default_color'] ?? DEFAULT_COLOR ) ?: DEFAULT_COLOR;
 
     // Post types — accept only registered public types.
     $clean['post_types'] = [];
@@ -114,7 +118,7 @@ function sanitize( mixed $input ): array {
                 'button_label' => sanitize_text_field( $cta['button_label'] ?? '' ),
                 'button_url'   => esc_url_raw( $cta['button_url'] ?? '' ),
                 'button_type'  => sanitize_key( $cta['button_type'] ?? 'link' ),
-                'accent_color' => sanitize_hex_color( $cta['accent_color'] ?? '#FF6B35' ) ?: '#FF6B35',
+                'accent_color' => sanitize_hex_color( $cta['accent_color'] ?? '' ) ?: '',
                 'position'     => in_array( $position, $valid_positions, true ) ? $position : 'inline',
             ];
         }

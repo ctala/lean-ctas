@@ -146,6 +146,19 @@ function render_page(): void {
                     </td>
                 </tr>
                 <tr>
+                    <th scope="row"><?php esc_html_e( 'Default accent color', 'lean-ctas' ); ?></th>
+                    <td>
+                        <input type="color"
+                            name="<?php echo esc_attr( OPTION_KEY ); ?>[default_color]"
+                            value="<?php echo esc_attr( $settings['default_color'] ); ?>"
+                            style="width:60px;height:36px">
+                        <code style="margin-left:8px;color:#666"><?php echo esc_html( $settings['default_color'] ); ?></code>
+                        <p class="description">
+                            <?php esc_html_e( 'Used when a CTA does not have its own color set.', 'lean-ctas' ); ?>
+                        </p>
+                    </td>
+                </tr>
+                <tr>
                     <th scope="row"><?php esc_html_e( 'Inline insert after paragraph #', 'lean-ctas' ); ?></th>
                     <td>
                         <input type="number" min="1" max="50"
@@ -260,9 +273,12 @@ function render_cta_row( int|string $i, array $cta, array $tax_options, array $p
                 </select>
             </div>
             <div>
-                <label><?php esc_html_e( 'Accent color', 'lean-ctas' ); ?></label>
+                <label><?php esc_html_e( 'Accent color (override)', 'lean-ctas' ); ?></label>
                 <input type="color" name="<?php echo esc_attr( $n ); ?>[accent_color]"
-                    value="<?php echo esc_attr( $cta['accent_color'] ); ?>">
+                    value="<?php echo esc_attr( $cta['accent_color'] ?: ( get_plugin_settings()['default_color'] ?? '#FF6B35' ) ); ?>">
+                <p class="description" style="font-size:11px;margin-top:4px">
+                    <?php esc_html_e( 'Leave default to use global color.', 'lean-ctas' ); ?>
+                </p>
             </div>
             <div>
                 <label><?php esc_html_e( 'Position', 'lean-ctas' ); ?></label>
