@@ -2,17 +2,15 @@
 /**
  * Shared helpers: defaults, getters, sanitizers.
  *
- * @package EcoCTA
- * @since   1.3.0
+ * @package LeanCTAs
+ * @since   2.0.0
  */
 
 declare( strict_types=1 );
 
-namespace EcoCTA\Helpers;
+namespace LeanCTAs\Helpers;
 
-use function EcoCTA\OPTION_KEY;
-
-use const EcoCTA\OPTION_KEY;
+use const LeanCTAs\OPTION_KEY;
 
 /**
  * Default plugin settings.

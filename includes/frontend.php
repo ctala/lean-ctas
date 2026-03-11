@@ -2,18 +2,20 @@
 /**
  * Frontend: content injection, rendering, shortcode, styles.
  *
- * @package EcoCTA
- * @since   1.3.0
+ * @package LeanCTAs
+ * @since   2.0.0
  */
 
 declare( strict_types=1 );
 
-namespace EcoCTA\Frontend;
+namespace LeanCTAs\Frontend;
 
-use function EcoCTA\Helpers\get_settings;
+use function LeanCTAs\Helpers\get_settings;
 
 add_filter( 'the_content', __NAMESPACE__ . '\\inject', 20 );
 add_action( 'wp_head', __NAMESPACE__ . '\\print_styles' );
+add_shortcode( 'lean_cta', __NAMESPACE__ . '\\shortcode' );
+// Legacy shortcode compat.
 add_shortcode( 'eco_cta', __NAMESPACE__ . '\\shortcode' );
 
 /* ─────────────────────────────────────────────
@@ -161,8 +163,6 @@ function has_term( array $post_terms, string $taxonomy, int $term_id ): bool {
 /**
  * Insert HTML after the Nth closing </p> tag.
  *
- * Falls back to appending at the end when the content has fewer paragraphs.
- *
  * @param string $content   Post HTML.
  * @param string $injection CTA HTML.
  * @param int    $after     Paragraph number (1-based).
@@ -207,7 +207,7 @@ function render( array $cta ): string {
     $accent = esc_attr( $cta['accent_color'] ?? '#FF6B35' );
     $title  = esc_html( $cta['title'] ?? '' );
     $text   = esc_html( $cta['text'] ?? '' );
-    $label  = esc_html( $cta['button_label'] ?: __( 'Learn more', 'eco-cta' ) );
+    $label  = esc_html( $cta['button_label'] ?: __( 'Learn more', 'lean-ctas' ) );
     $url    = esc_url( $cta['button_url'] ?? '#' );
 
     $icon = match ( $cta['button_type'] ?? 'link' ) {
@@ -216,16 +216,16 @@ function render( array $cta ): string {
         default      => '→',
     };
 
-    $html = '<div class="eco-cta-block" style="--eco-accent:' . $accent . '">';
+    $html = '<div class="lean-cta-block" style="--lean-accent:' . $accent . '">';
 
     if ( $title ) {
-        $html .= '<p class="eco-cta-title">' . $title . '</p>';
+        $html .= '<p class="lean-cta-title">' . $title . '</p>';
     }
     if ( $text ) {
-        $html .= '<p class="eco-cta-text">' . $text . '</p>';
+        $html .= '<p class="lean-cta-text">' . $text . '</p>';
     }
 
-    $html .= '<a class="eco-cta-btn" href="' . $url . '" target="_blank" rel="noopener">'
+    $html .= '<a class="lean-cta-btn" href="' . $url . '" target="_blank" rel="noopener">'
            . $icon . ' ' . $label
            . '</a></div>';
 
@@ -248,27 +248,22 @@ function print_styles(): void {
     }
 
     ?>
-    <style id="eco-cta-styles">
-    .eco-cta-block{--eco-accent:#FF6B35;border-left:4px solid var(--eco-accent);background:#f9f9f9;padding:16px 20px;margin:28px 0;border-radius:0 6px 6px 0;font-family:inherit}
-    .eco-cta-title{font-weight:700;font-size:1.05em;margin:0 0 6px;color:#111}
-    .eco-cta-text{margin:0 0 12px;color:#444;font-size:.95em;line-height:1.5}
-    .eco-cta-btn{display:inline-block;background:var(--eco-accent);color:#fff!important;padding:8px 18px;border-radius:4px;text-decoration:none!important;font-weight:600;font-size:.9em;transition:opacity .2s}
-    .eco-cta-btn:hover{opacity:.85}
-    @media(max-width:600px){.eco-cta-btn{display:block;text-align:center}}
+    <style id="lean-cta-styles">
+    .lean-cta-block{--lean-accent:#FF6B35;border-left:4px solid var(--lean-accent);background:#f9f9f9;padding:16px 20px;margin:28px 0;border-radius:0 6px 6px 0;font-family:inherit}
+    .lean-cta-title{font-weight:700;font-size:1.05em;margin:0 0 6px;color:#111}
+    .lean-cta-text{margin:0 0 12px;color:#444;font-size:.95em;line-height:1.5}
+    .lean-cta-btn{display:inline-block;background:var(--lean-accent);color:#fff!important;padding:8px 18px;border-radius:4px;text-decoration:none!important;font-weight:600;font-size:.9em;transition:opacity .2s}
+    .lean-cta-btn:hover{opacity:.85}
+    @media(max-width:600px){.lean-cta-btn{display:block;text-align:center}}
     </style>
     <?php
 }
 
 /* ─────────────────────────────────────────────
-   Shortcode  [eco_cta post_type="..." taxonomy="..." term="..." category="..."]
+   Shortcode  [lean_cta] or [eco_cta] (legacy)
 ───────────────────────────────────────────── */
 
 /**
- * Render a CTA via shortcode. Accepts:
- *   - category="16"                    (legacy, maps to taxonomy=category)
- *   - post_type="glosario"
- *   - taxonomy="category" term="16"
- *
  * @param array<string, string>|string $atts Shortcode attributes.
  * @return string HTML.
  */
@@ -277,8 +272,8 @@ function shortcode( array|string $atts ): string {
         'post_type' => '',
         'taxonomy'  => '',
         'term'      => 0,
-        'category'  => 0,   // Legacy compat.
-    ], $atts, 'eco_cta' );
+        'category'  => 0,
+    ], $atts, 'lean_cta' );
 
     $settings = get_settings();
 
@@ -296,7 +291,6 @@ function shortcode( array|string $atts ): string {
     $target_tax  = sanitize_key( $atts['taxonomy'] );
     $target_term = (int) $atts['term'];
 
-    // Find best matching CTA.
     foreach ( $settings['ctas'] as $c ) {
         $match_pt  = empty( $target_pt ) || ( ! empty( $c['post_type'] ) && $c['post_type'] === $target_pt );
         $match_tax = empty( $target_tax ) || (

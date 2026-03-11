@@ -1,30 +1,30 @@
 <?php
 /**
- * Plugin Name:       Eco CTA Plugin
- * Plugin URI:        https://github.com/ctala/eco-cta-plugin
+ * Plugin Name:       Lean CTAs
+ * Plugin URI:        https://github.com/ctala/lean-ctas
  * Description:       Lightweight dynamic CTAs injected into post content by post type, taxonomy, or category. Zero dependencies.
- * Version:           1.3.0
+ * Version:           2.0.0
  * Requires at least: 6.4
  * Requires PHP:      8.1
  * Author:            Cristian Tala
  * Author URI:        https://cristiantala.com
  * License:           GPL-2.0-or-later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
- * Text Domain:       eco-cta
+ * Text Domain:       lean-ctas
  * Domain Path:       /languages
  */
 
 declare( strict_types=1 );
 
-namespace EcoCTA;
+namespace LeanCTAs;
 
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-const VERSION    = '1.3.0';
-const OPTION_KEY = 'eco_cta_settings';
-const SLUG       = 'eco-cta';
+const VERSION    = '2.0.0';
+const OPTION_KEY = 'lean_ctas_settings';
+const SLUG       = 'lean-ctas';
 
 /* ─────────────────────────────────────────────
    Bootstrap
@@ -40,7 +40,7 @@ function activate(): void {
     if ( version_compare( PHP_VERSION, '8.1', '<' ) ) {
         deactivate_plugins( plugin_basename( __FILE__ ) );
         wp_die(
-            esc_html__( 'Eco CTA Plugin requires PHP 8.1 or higher.', 'eco-cta' ),
+            esc_html__( 'Lean CTAs requires PHP 8.1 or higher.', 'lean-ctas' ),
             'Plugin Activation Error',
             [ 'back_link' => true ]
         );
@@ -48,5 +48,12 @@ function activate(): void {
 
     if ( false === get_option( OPTION_KEY ) ) {
         add_option( OPTION_KEY, Helpers\defaults() );
+    }
+
+    // Migrate from eco-cta if upgrading.
+    $legacy = get_option( 'eco_cta_settings' );
+    if ( false !== $legacy && false === get_option( OPTION_KEY ) ) {
+        add_option( OPTION_KEY, $legacy );
+        delete_option( 'eco_cta_settings' );
     }
 }

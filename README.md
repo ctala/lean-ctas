@@ -1,4 +1,4 @@
-# Eco CTA Plugin
+# Lean CTAs
 
 [![WordPress](https://img.shields.io/badge/WordPress-6.4%2B-blue)](https://wordpress.org)
 [![PHP](https://img.shields.io/badge/PHP-8.1%2B-purple)](https://www.php.net)
@@ -12,7 +12,7 @@ Lightweight WordPress plugin that injects dynamic CTAs into post content based o
 
 ## How It Works
 
-The plugin hooks into `the_content` and inserts a CTA block at the configured position, selecting the right CTA using a priority-based matching engine:
+Hooks into `the_content` and inserts a CTA block at the configured position, selecting the right CTA using a priority-based matching engine:
 
 ```
 [Paragraph 1]
@@ -37,22 +37,19 @@ The plugin hooks into `the_content` and inserts a CTA block at the configured po
 
 ## Requirements
 
-| Dependency | Version |
+| Dependency | Minimum |
 |-----------|---------|
-| WordPress | ≥ 6.4 |
-| PHP | ≥ 8.1 |
+| WordPress | 6.4 |
+| PHP | 8.1 |
 
 ## Installation
 
 ```bash
-# Via Git
 cd /path/to/wp-content/plugins/
-git clone https://github.com/ctala/eco-cta-plugin.git
-
-# Or upload the zip from GitHub Releases
+git clone https://github.com/ctala/lean-ctas.git
 ```
 
-Activate in **Plugins → Installed Plugins**, then configure at **Settings → Eco CTA**.
+Activate in **Plugins → Installed Plugins**, then configure at **Settings → Lean CTAs**.
 
 ## Configuration
 
@@ -82,24 +79,25 @@ Activate in **Plugins → Installed Plugins**, then configure at **Settings → 
 ### Shortcode
 
 ```
-[eco_cta]                                          <!-- global fallback -->
-[eco_cta category="16"]                            <!-- legacy compat -->
-[eco_cta post_type="glosario"]                     <!-- by post type -->
-[eco_cta taxonomy="product_cat" term="42"]         <!-- by taxonomy -->
+[lean_cta]                                         <!-- global fallback -->
+[lean_cta category="16"]                           <!-- by WP category -->
+[lean_cta post_type="glosario"]                    <!-- by post type -->
+[lean_cta taxonomy="product_cat" term="42"]        <!-- by taxonomy -->
 ```
+
+Legacy `[eco_cta]` shortcode is still supported.
 
 ## Project Structure
 
 ```
-eco-cta-plugin/
-├── eco-cta-plugin.php      ← Entry point, bootstrap
+lean-ctas/
+├── lean-ctas.php            ← Entry point, bootstrap
 ├── includes/
 │   ├── helpers.php          ← Defaults, getters, sanitizers
 │   ├── admin.php            ← Settings page, CTA row renderer
 │   └── frontend.php         ← Content injection, matching, shortcode
-├── assets/
-│   └── css/                 ← (reserved for future extracted styles)
-├── languages/               ← Translation files (.pot/.po/.mo)
+├── assets/css/              ← (reserved for future extracted styles)
+├── languages/               ← Translation files
 ├── readme.txt               ← WordPress.org standard readme
 ├── CHANGELOG.md             ← Keep a Changelog format
 └── README.md                ← This file
@@ -108,39 +106,25 @@ eco-cta-plugin/
 ## CSS Customization
 
 ```css
-/* Override from your theme */
-.eco-cta-block {
-    --eco-accent: #FF6B35;
+.lean-cta-block {
+    --lean-accent: #FF6B35;
 }
 ```
 
-## Development
+## Upgrading from Eco CTA Plugin
 
-```bash
-# Clone
-git clone https://github.com/ctala/eco-cta-plugin.git
-cd eco-cta-plugin
-
-# No build step needed — pure PHP
-# Test on any WP 6.4+ / PHP 8.1+ environment
-```
-
-### Versioning
-
-- Follows [Semantic Versioning 2.0.0](https://semver.org/)
-- Changelog follows [Keep a Changelog 1.1.0](https://keepachangelog.com/)
-- WordPress readme.txt follows [WordPress Plugin Readme Standard](https://developer.wordpress.org/plugins/wordpress-org/how-your-readme-txt-works/)
+Lean CTAs v2.0.0 auto-migrates settings from `eco_cta_settings` on activation. The `[eco_cta]` shortcode still works.
 
 ## Roadmap
 
 - [x] Multi post type + taxonomy support
 - [x] Position control (inline / end / both)
 - [x] Namespaced modular architecture
-- [ ] Click tracking (GA4 event / custom endpoint)
+- [ ] Click tracking (GA4 / custom endpoint)
 - [ ] A/B variants per CTA
 - [ ] Multiple CTAs per post (rotation)
 - [ ] Block editor sidebar panel
-- [ ] REST API endpoint for headless usage
+- [ ] REST API endpoint for headless
 
 ## License
 
