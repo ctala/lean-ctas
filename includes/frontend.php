@@ -271,7 +271,7 @@ function print_styles(): void {
  * @param array<string, string>|string $atts Shortcode attributes.
  * @return string HTML.
  */
-function shortcode( array|string $atts ): string {
+function shortcode( $atts ): string {
     $atts = shortcode_atts( [
         'post_type' => '',
         'taxonomy'  => '',

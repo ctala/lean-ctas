@@ -70,7 +70,7 @@ function cta_defaults(): array {
  * @param mixed $input Raw form input.
  * @return array<string, mixed>
  */
-function sanitize( mixed $input ): array {
+function sanitize( $input ): array {
     $clean = defaults();
 
     if ( ! is_array( $input ) ) {

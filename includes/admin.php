@@ -67,7 +67,7 @@ function register_settings(): void {
  * @param mixed $value Raw option value.
  * @return mixed
  */
-function parse_combo_values( mixed $value ): mixed {
+function parse_combo_values( $value ) {
     if ( ! is_array( $value ) || empty( $value['ctas'] ) ) {
         return $value;
     }
@@ -230,7 +230,7 @@ function render_page(): void {
  * @param array<string, array>             $tax_options  Taxonomy options.
  * @param array<string, \WP_Post_Type>     $public_types Public post types.
  */
-function render_cta_row( int|string $i, array $cta, array $tax_options, array $public_types ): void {
+function render_cta_row( $i, array $cta, array $tax_options, array $public_types ) {
     $cta = wp_parse_args( $cta, cta_defaults() );
     $n   = OPTION_KEY . "[ctas][{$i}]";
     ?>
