@@ -1,4 +1,6 @@
 <?php
+
+declare( strict_types=1 );
 /**
  * Frontend: content injection, rendering, shortcode, styles.
  *
@@ -60,16 +62,12 @@ function inject( string $content ): string {
     $html     = render( $cta );
     $position = $cta['position'] ?? 'inline';
 
-    switch ( $position ) {
-        case 'inline':
-            return insert_after_paragraph( $content, $html, $settings['insert_after_paragraph'] );
-        case 'end':
-            return $content . $html;
-        case 'both':
-            return insert_after_paragraph( $content, $html, $settings['insert_after_paragraph'] ) . $html;
-        default:
-            return $content . $html;
-    }
+    return match ( $position ) {
+        'inline' => insert_after_paragraph( $content, $html, $settings['insert_after_paragraph'] ),
+        'end'    => $content . $html,
+        'both'   => insert_after_paragraph( $content, $html, $settings['insert_after_paragraph'] ) . $html,
+        default  => $content . $html,
+    };
 }
 
 /* ─────────────────────────────────────────────
@@ -218,17 +216,11 @@ function render( array $cta ): string {
     $label  = esc_html( $cta['button_label'] ?: __( 'Learn more', 'lean-ctas' ) );
     $url    = esc_url( $cta['button_url'] ?? '#' );
 
-    $type = $cta['button_type'] ?? 'link';
-    switch ( $type ) {
-        case 'newsletter':
-            $icon = '📧';
-            break;
-        case 'community':
-            $icon = '👥';
-            break;
-        default:
-            $icon = '→';
-    }
+    $icon = match ( $cta['button_type'] ?? 'link' ) {
+        'newsletter' => '📧',
+        'community'  => '👥',
+        default      => '→',
+    };
 
     $html = '<div class="lean-cta-block" style="--lean-accent:' . $accent . '">';
 
@@ -281,7 +273,7 @@ function print_styles(): void {
  * @param array<string, string>|string $atts Shortcode attributes.
  * @return string HTML.
  */
-function shortcode( $atts ): string {
+function shortcode( array|string $atts ): string {
     $atts = shortcode_atts( [
         'post_type' => '',
         'taxonomy'  => '',

@@ -5,11 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.1.1] - 2026-03-11
+## [2.2.0] - 2026-03-11
 
 ### Changed
-- Lowered minimum PHP requirement from 8.1 to 7.4
-- Removed `strict_types` declarations for broader compatibility
+- Restored PHP 8.1 minimum requirement (proper `match`, union types, `strict_types`)
+- v2.1.1 PHP 7.4 compat was unnecessary — Rocket.net CLI uses 7.4 but web runs 8.3
 
 ## [2.1.0] - 2026-03-11
 

@@ -1,4 +1,6 @@
 <?php
+
+declare( strict_types=1 );
 /**
  * Shared helpers: defaults, getters, sanitizers.
  *
@@ -70,7 +72,7 @@ function cta_defaults(): array {
  * @param mixed $input Raw form input.
  * @return array<string, mixed>
  */
-function sanitize( $input ): array {
+function sanitize( mixed $input ): array {
     $clean = defaults();
 
     if ( ! is_array( $input ) ) {
