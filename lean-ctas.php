@@ -36,10 +36,10 @@ require_once __DIR__ . '/includes/frontend.php';
 register_activation_hook( __FILE__, __NAMESPACE__ . '\\activate' );
 
 function activate(): void {
-    if ( version_compare( PHP_VERSION, '8.1', '<' ) ) {
+    if ( version_compare( PHP_VERSION, '7.4', '<' ) ) {
         deactivate_plugins( plugin_basename( __FILE__ ) );
         wp_die(
-            esc_html__( 'Lean CTAs requires PHP 8.1 or higher.', 'lean-ctas' ),
+            esc_html__( 'Lean CTAs requires PHP 7.4 or higher.', 'lean-ctas' ),
             'Plugin Activation Error',
             [ 'back_link' => true ]
         );
