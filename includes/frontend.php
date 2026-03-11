@@ -255,13 +255,16 @@ function print_styles(): void {
 
     ?>
     <style id="lean-cta-styles">
-    .lean-cta-block{--lean-accent:<?php echo esc_attr( $settings['default_color'] ?? '#FF6B35' ); ?>;border-left:4px solid var(--lean-accent);background:#f9f9f9;padding:16px 20px;margin:28px 0;border-radius:0 6px 6px 0;font-family:inherit}
-    .lean-cta-title{font-weight:700;font-size:1.05em;margin:0 0 6px;color:#111}
-    .lean-cta-text{margin:0 0 12px;color:#444;font-size:.95em;line-height:1.5}
+    .lean-cta-block{--lean-accent:<?php echo esc_attr( $settings['default_color'] ?? '#FF6B35' ); ?>;--lean-bg:rgba(0,0,0,.04);--lean-title:#111;--lean-text:#444;border-left:4px solid var(--lean-accent);background:var(--lean-bg);padding:16px 20px;margin:28px 0;border-radius:0 6px 6px 0;font-family:inherit}
+    .lean-cta-title{font-weight:700;font-size:1.05em;margin:0 0 6px;color:var(--lean-title)}
+    .lean-cta-text{margin:0 0 12px;color:var(--lean-text);font-size:.95em;line-height:1.5}
     .lean-cta-btn{display:inline-block;background:var(--lean-accent);color:#fff!important;padding:8px 18px;border-radius:4px;text-decoration:none!important;font-weight:600;font-size:.9em;transition:opacity .2s}
     .lean-cta-btn:hover{opacity:.85}
+    @media(prefers-color-scheme:dark){.lean-cta-block{--lean-bg:rgba(255,255,255,.06);--lean-title:rgba(255,255,255,.92);--lean-text:rgba(255,255,255,.7)}}
+    .dark .lean-cta-block,[data-theme=dark] .lean-cta-block,[data-color-scheme=dark] .lean-cta-block,.lean-cta-dark{--lean-bg:rgba(255,255,255,.06);--lean-title:rgba(255,255,255,.92);--lean-text:rgba(255,255,255,.7)}
     @media(max-width:600px){.lean-cta-btn{display:block;text-align:center}}
     </style>
+    <script>document.addEventListener('DOMContentLoaded',function(){var b=getComputedStyle(document.body).backgroundColor,m=b.match(/\d+/g);if(m&&m.length>=3){var l=(.299*m[0]+.587*m[1]+.114*m[2]);if(l<128)document.querySelectorAll('.lean-cta-block').forEach(function(e){e.classList.add('lean-cta-dark')})}})</script>
     <?php
 }
 

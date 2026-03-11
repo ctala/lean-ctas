@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0] - 2026-03-11
+
+### Added
+- Dark mode support: `prefers-color-scheme`, `.dark`, `[data-theme=dark]`, and auto-detection via background luminosity
+- CSS variables `--lean-bg`, `--lean-title`, `--lean-text` for theme-aware styling
+
+### Fixed
+- CTA block was a white rectangle on dark themes (hardcoded `#f9f9f9` background)
+
 ## [2.2.0] - 2026-03-11
 
 ### Changed
