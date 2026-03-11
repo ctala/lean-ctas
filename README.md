@@ -1,131 +1,99 @@
 # Lean CTAs
 
-[![WordPress](https://img.shields.io/badge/WordPress-6.4%2B-blue)](https://wordpress.org)
-[![PHP](https://img.shields.io/badge/PHP-8.1%2B-purple)](https://www.php.net)
+[![WordPress](https://img.shields.io/badge/WordPress-6.4%2B-blue)](https://wordpress.org/)
+[![PHP](https://img.shields.io/badge/PHP-8.1%2B-purple)](https://php.net/)
 [![License](https://img.shields.io/badge/License-GPL--2.0--or--later-green)](LICENSE)
+[![Version](https://img.shields.io/badge/version-2.3.0-orange)](CHANGELOG.md)
 
-Lightweight WordPress plugin that injects dynamic CTAs into post content based on post type, taxonomy, or category.
+Lightweight WordPress plugin that dynamically injects Call-to-Action blocks into your post content based on post type, taxonomy, or category. Zero dependencies, works with any theme.
 
-**Zero dependencies. Modular PHP. Under 30KB.**
+## Features
 
----
+- **Smart matching** — Most specific CTA wins (type+term → term → type → global)
+- **Per-category colors** — Different accent color per CTA
+- **Dark mode** — Auto-detects dark themes, no configuration needed
+- **Position control** — Inline (after paragraph N), end of post, or both
+- **Any post type** — Posts, pages, custom post types
+- **Any taxonomy** — Categories, tags, custom taxonomies
+- **Shortcode** — `[lean_cta]` for manual placement
+- **Zero dependencies** — Pure PHP, no build tools, no external assets
 
-## How It Works
+## Quick Start
 
-Hooks into `the_content` and inserts a CTA block at the configured position, selecting the right CTA using a priority-based matching engine:
+1. Upload `lean-ctas/` to `/wp-content/plugins/`
+2. Activate the plugin
+3. Go to **Settings → Lean CTAs**
+4. Add your CTAs, save, done
 
-```
-[Paragraph 1]
-[Paragraph 2]
-[Paragraph 3]
-┌─────────────────────────────────────────┐
-│  🚀 Looking for funding?               │
-│  We share open calls every week.        │
-│  [ 📧 Subscribe free ]                 │
-└─────────────────────────────────────────┘
-[Paragraph 4...]
-```
+## How Matching Works
 
-## Use Cases
+| Priority | Condition | Example |
+|----------|-----------|---------|
+| 1 (highest) | Post type + specific term | Posts in "Technology" category |
+| 2 | Specific term (any type) | Any content tagged "startup" |
+| 3 | Post type (any term) | All posts |
+| 4 (lowest) | Global fallback | Everything else |
 
-| Scenario | Configuration |
-|----------|---------------|
-| News blog | Different CTA per category (Tech → lead magnet, Finance → newsletter) |
-| Glossary (CPT) | Community CTA on every glossary entry |
-| WooCommerce | CTA by product category |
-| Any categorized site | Global fallback + specific overrides |
+One CTA per post — the best match wins.
 
-## Requirements
+## Color System
 
-| Dependency | Minimum |
-|-----------|---------|
-| WordPress | 6.4 |
-| PHP | 8.1 |
-
-## Installation
-
-```bash
-cd /path/to/wp-content/plugins/
-git clone https://github.com/ctala/lean-ctas.git
-```
-
-Activate in **Plugins → Installed Plugins**, then configure at **Settings → Lean CTAs**.
-
-## Configuration
-
-### Global Settings
-
-- **Enabled** — Master on/off
-- **Post Types** — Which post types the plugin runs on
-- **Inline position** — After which paragraph to inject
-
-### Per CTA
-
-| Field | Description |
-|-------|-------------|
-| Post Type | Filter by specific type or "All enabled" |
-| Taxonomy/Term | Filter by any public taxonomy term |
-| Position | Inline (paragraph N) / End of post / Both |
-| Accent color | Border + button color |
-| Title, text, button, URL | CTA content |
-
-### Matching Priority
-
-1. **Post type + term** → most specific match
-2. **Term only** → cross-type taxonomy match
-3. **Post type only** → generic type CTA
-4. **Global fallback** → no filters set
-
-### Shortcode
+Set a **default accent color** in settings. Each CTA can optionally override it.
 
 ```
-[lean_cta]                                         <!-- global fallback -->
-[lean_cta category="16"]                           <!-- by WP category -->
-[lean_cta post_type="glosario"]                    <!-- by post type -->
-[lean_cta taxonomy="product_cat" term="42"]        <!-- by taxonomy -->
+Default color: #2563EB (blue)
+├── Technology CTA → #2196F3 (override)
+├── Startups CTA  → #FF6B35 (override)
+├── Business CTA  → #4CAF50 (override)
+└── Fallback CTA  → uses default #2563EB
 ```
 
-Legacy `[eco_cta]` shortcode is still supported.
+The accent color controls the left border and button background.
 
-## Project Structure
+## Dark Mode
 
-```
-lean-ctas/
-├── lean-ctas.php            ← Entry point, bootstrap
-├── includes/
-│   ├── helpers.php          ← Defaults, getters, sanitizers
-│   ├── admin.php            ← Settings page, CTA row renderer
-│   └── frontend.php         ← Content injection, matching, shortcode
-├── assets/css/              ← (reserved for future extracted styles)
-├── languages/               ← Translation files
-├── readme.txt               ← WordPress.org standard readme
-├── CHANGELOG.md             ← Keep a Changelog format
-└── README.md                ← This file
-```
+**Works automatically.** No configuration, no CSS overrides, no code changes.
 
-## CSS Customization
+The plugin detects dark themes through:
+
+1. `prefers-color-scheme: dark` (OS-level)
+2. `.dark` class on `<html>` or `<body>`
+3. `data-theme="dark"` or `data-color-scheme="dark"` attributes
+4. **Background luminosity** — measures `<body>` background color and adapts if it's dark
+
+| Property | Light Theme | Dark Theme |
+|----------|------------|------------|
+| Background | `rgba(0,0,0,.04)` | `rgba(255,255,255,.06)` |
+| Title | `#111` | `rgba(255,255,255,.92)` |
+| Text | `#444` | `rgba(255,255,255,.7)` |
+| Button | Accent color, white text | Same |
+
+## Custom CSS
+
+Override with CSS custom properties:
 
 ```css
 .lean-cta-block {
     --lean-accent: #FF6B35;
+    --lean-bg: rgba(0,0,0,.04);
+    --lean-title: #111;
+    --lean-text: #444;
 }
 ```
 
-## Upgrading from Eco CTA Plugin
+## Shortcode
 
-Lean CTAs v2.0.0 auto-migrates settings from `eco_cta_settings` on activation. The `[eco_cta]` shortcode still works.
+```
+[lean_cta]                        <!-- Best match for current post -->
+[lean_cta post_type="glosario"]   <!-- Force post type -->
+[lean_cta category="131"]         <!-- Force category -->
+```
 
-## Roadmap
+## Requirements
 
-- [x] Multi post type + taxonomy support
-- [x] Position control (inline / end / both)
-- [x] Namespaced modular architecture
-- [ ] Click tracking (GA4 / custom endpoint)
-- [ ] A/B variants per CTA
-- [ ] Multiple CTAs per post (rotation)
-- [ ] Block editor sidebar panel
-- [ ] REST API endpoint for headless
+- WordPress 6.4+
+- PHP 8.1+
 
 ## License
 
-[GPL-2.0-or-later](https://www.gnu.org/licenses/gpl-2.0.html)
+GPL-2.0-or-later
