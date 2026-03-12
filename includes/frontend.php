@@ -260,7 +260,6 @@ function print_styles(): void {
     .lean-cta-text{margin:0 0 12px;color:var(--lean-text);font-size:.95em;line-height:1.5}
     .lean-cta-btn{display:inline-block;background:var(--lean-accent);color:#fff!important;padding:8px 18px;border-radius:4px;text-decoration:none!important;font-weight:600;font-size:.9em;transition:opacity .2s}
     .lean-cta-btn:hover{opacity:.85}
-    @media(prefers-color-scheme:dark){.lean-cta-block{--lean-bg:rgba(255,255,255,.06);--lean-title:rgba(255,255,255,.92);--lean-text:rgba(255,255,255,.7)}}
     .dark .lean-cta-block,[data-theme=dark] .lean-cta-block,[data-color-scheme=dark] .lean-cta-block,.lean-cta-dark{--lean-bg:rgba(255,255,255,.06);--lean-title:rgba(255,255,255,.92);--lean-text:rgba(255,255,255,.7)}
     @media(max-width:600px){.lean-cta-btn{display:block;text-align:center}}
     </style>
