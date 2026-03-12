@@ -18,12 +18,36 @@ Lightweight WordPress plugin that dynamically injects Call-to-Action blocks into
 - **Shortcode** — `[lean_cta]` for manual placement
 - **Zero dependencies** — Pure PHP, no build tools, no external assets
 
+## Installation
+
+> **Note:** This plugin is not yet available on wordpress.org. Install manually using one of the methods below.
+
+### Option 1 — Direct Download (recommended)
+
+1. Download the latest zip: **[lean-ctas.zip](https://assets.cristiantala.com/tools/lean-ctas.zip)**
+2. In your WordPress admin, go to **Plugins → Add New → Upload Plugin**
+3. Choose the downloaded `lean-ctas.zip` and click **Install Now**
+4. Activate the plugin
+
+### Option 2 — From GitHub
+
+1. Go to [Releases](https://github.com/ctala/lean-ctas/releases) and download the latest `.zip`
+2. Upload via **Plugins → Add New → Upload Plugin** in wp-admin
+
+### Option 3 — Manual (FTP/SSH)
+
+1. Download and unzip `lean-ctas.zip`
+2. Upload the `lean-ctas/` folder to `/wp-content/plugins/`
+3. Activate in **Plugins → Installed Plugins**
+
 ## Quick Start
 
-1. Upload `lean-ctas/` to `/wp-content/plugins/`
-2. Activate the plugin
-3. Go to **Settings → Lean CTAs**
-4. Add your CTAs, save, done
+1. Go to **Settings → Lean CTAs**
+2. Check **Enable CTAs** and select which post types should show CTAs
+3. Set your default accent color
+4. Click **+ Add CTA** — fill in title, text, button label, and URL
+5. Choose position: inline, end of post, or both
+6. Save — done
 
 ## How Matching Works
 
