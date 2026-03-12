@@ -3,7 +3,7 @@
 [![WordPress](https://img.shields.io/badge/WordPress-6.4%2B-blue)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-8.1%2B-purple)](https://php.net/)
 [![License](https://img.shields.io/badge/License-GPL--2.0--or--later-green)](LICENSE)
-[![Version](https://img.shields.io/badge/version-2.3.0-orange)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2.3.1-orange)](CHANGELOG.md)
 
 Lightweight WordPress plugin that dynamically injects Call-to-Action blocks into your post content based on post type, taxonomy, or category. Zero dependencies, works with any theme.
 
