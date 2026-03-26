@@ -4,7 +4,7 @@ Tags: cta, call-to-action, inline-cta, dynamic-cta, content-marketing
 Requires at least: 6.4
 Tested up to: 6.9
 Requires PHP: 8.1
-Stable tag: 2.3.1
+Stable tag: 2.3.2
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -165,10 +165,13 @@ Yes. Override the CSS custom properties:
 
 == Upgrade Notice ==
 
-= 2.3.1 =
-Fix: dark mode media query no longer overrides theme detection on light themes with OS-level dark mode.
+= 2.3.2 =
+Fix: CTAs now appear correctly when LeanAutoLinks plugin is active.
 
 == Changelog ==
+
+= 2.3.2 =
+* Fixed CTAs disappearing when LeanAutoLinks plugin was active. Moved content filter to priority 1001 to run after AutoLinks cache layer (priority 999).
 
 = 2.3.1 =
 * Fixed prefers-color-scheme media query overriding theme detection on light themes with OS dark mode

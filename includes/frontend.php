@@ -17,7 +17,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 use function LeanCTAs\Helpers\get_plugin_settings;
 
-add_filter( 'the_content', __NAMESPACE__ . '\\inject', 20 );
+// Priority 1001: must run AFTER leanautolinks (priority 999) which replaces
+// content with its pre-cached version. Running before it would lose the CTA.
+add_filter( 'the_content', __NAMESPACE__ . '\\inject', 1001 );
 add_action( 'wp_head', __NAMESPACE__ . '\\print_styles' );
 add_shortcode( 'lean_cta', __NAMESPACE__ . '\\shortcode' );
 // Legacy shortcode compat.
@@ -30,7 +32,8 @@ add_shortcode( 'eco_cta', __NAMESPACE__ . '\\shortcode' );
 /**
  * Inject the matching CTA into the post content.
  *
- * Runs at priority 20 to let shortcodes and embeds process first.
+ * Runs at priority 1001, after leanautolinks (999) replaces content with
+ * its pre-cached version. Running earlier would lose the injected CTA.
  */
 function inject( string $content ): string {
     if ( is_admin() || ! in_the_loop() || ! is_main_query() ) {

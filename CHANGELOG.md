@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.2] - 2026-03-26
+
+### Fixed
+- CTA blocks disappeared when LeanAutoLinks plugin was active. Root cause: CTAs injected at priority 20, but AutoLinks at priority 999 replaced content with its pre-cached version (which never contained the CTA). Moved CTA injection to priority 1001 to run after AutoLinks.
+
 ## [2.3.1] - 2026-03-11
 
 ### Fixed
@@ -97,6 +102,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `[eco_cta]` shortcode
 - Mobile-first CSS with CSS custom properties
 
+[2.3.2]: https://github.com/ctala/lean-ctas/compare/v2.3.1...v2.3.2
 [2.3.1]: https://github.com/ctala/lean-ctas/compare/v2.3.0...v2.3.1
 [2.3.0]: https://github.com/ctala/lean-ctas/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/ctala/lean-ctas/compare/v2.1.0...v2.2.0
