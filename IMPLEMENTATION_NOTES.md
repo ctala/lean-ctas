@@ -64,6 +64,35 @@ No auth. Respects list opt-in setting (double opt-in if configured).
 13. Success message: e.g. "Revisa tu email para confirmar la suscripción."
 14. Save Changes.
 
+## Sitewide popup placement (`position: manual` + `[lean_cta optin="1"]`)
+
+The opt-in form does not have to be injected into post content. A CTA with
+`position: manual` is **never** auto-injected by `inject()`; it is rendered only
+where you place the shortcode `[lean_cta optin="1"]`, which renders the first
+configured `optin_form` CTA directly (bypassing post/taxonomy matching).
+
+This is how the sitewide **Daily Shot popup** uses it: the popup mu-plugin
+(`wp_footer`) calls `do_shortcode('[lean_cta optin="1"]')` instead of the old
+`[forminator_form id="55561"]`. Because the popup appears on every page,
+`print_styles()` loads the form CSS + progressive-enhancement JS whenever any
+`optin_form` CTA is configured (not only on singular post-type pages).
+
+On successful subscription the JS dispatches a `leanctas:subscribed` DOM event
+(`document`), so the popup can auto-close and set its "don't show again" cookie:
+
+```js
+document.addEventListener('leanctas:subscribed', function(e){ /* close popup */ });
+```
+
+## Listmonk credentials (URL + API user + token — all editable)
+
+`listmonk_url`, `listmonk_api_user`, `listmonk_api_token` are editable in
+Settings → Lean CTAs. They are stored server-side only and never sent to the
+browser. The **subscription flow uses the public endpoint and needs no auth** —
+the user/token are stored for cross-site reuse, surviving a Listmonk migration,
+and future admin features (e.g. fetching list names for a dropdown). Keeping
+them configurable means the same plugin works across sites without code edits.
+
 ## Security model — why no WP nonce
 
 WP nonces expire in ~24h. Eco runs server-level page cache (WPMU DEV) that serves cached HTML for days. A nonce baked into the rendered form would be stale on the first cache hit past its expiry, silently rejecting every subscription attempt until the cache is purged.

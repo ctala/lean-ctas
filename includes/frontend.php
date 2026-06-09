@@ -62,8 +62,15 @@ function inject( string $content ): string {
         return $content;
     }
 
-    $html     = render( $cta );
     $position = $cta['position'] ?? 'inline';
+
+    // 'manual' CTAs are shortcode-only (e.g. rendered inside the sitewide
+    // popup via [lean_cta optin="1"]) — never auto-injected into content.
+    if ( 'manual' === $position ) {
+        return $content;
+    }
+
+    $html = render( $cta );
 
     return match ( $position ) {
         'inline' => insert_after_paragraph( $content, $html, $settings['insert_after_paragraph'] ),
@@ -344,17 +351,21 @@ function print_styles(): void {
         return;
     }
 
-    if ( ! is_singular( $settings['post_types'] ) ) {
-        return;
-    }
-
-    // Detect if any optin_form CTA could be active on this page (for JS decision).
+    // Detect if any optin_form CTA is configured. An opt-in form may be rendered
+    // sitewide via the [lean_cta optin="1"] shortcode (e.g. the Daily Shot popup
+    // in wp_footer), so its styles/JS must load beyond singular pages.
     $has_optin = false;
     foreach ( $settings['ctas'] as $cta ) {
         if ( ( $cta['button_type'] ?? '' ) === 'optin_form' ) {
             $has_optin = true;
             break;
         }
+    }
+
+    // Load on singular post-type pages (inline-injected CTAs) OR anywhere an
+    // opt-in form can appear via shortcode (sitewide popup).
+    if ( ! is_singular( $settings['post_types'] ) && ! $has_optin ) {
+        return;
     }
 
     // No nonce: cached pages would serve a stale nonce after ~24h, silently
@@ -403,7 +414,10 @@ function print_styles(): void {
             var s=f.closest('.lean-cta-optin-state');
             if(d.success&&s){s.innerHTML='<p class="lean-cta-optin-success" role="status">'+
                 (f.dataset.success||'Check your email to confirm.')+
-            '</p>'}else{btn.disabled=false;var err=f.querySelector('.lean-cta-optin-error');
+            '</p>';
+            // Notify listeners (e.g. the sitewide popup auto-closes on this).
+            document.dispatchEvent(new CustomEvent('leanctas:subscribed',{detail:{list:f.dataset.list}}));
+            }else{btn.disabled=false;var err=f.querySelector('.lean-cta-optin-error');
             if(err)err.style.display='';else{var p=document.createElement('p');
             p.className='lean-cta-optin-error';p.setAttribute('role','alert');
             p.textContent='Something went wrong. Please try again.';f.appendChild(p);}}
@@ -430,11 +444,23 @@ function shortcode( array|string $atts ): string {
         'taxonomy'  => '',
         'term'      => 0,
         'category'  => 0,
+        'optin'     => '',
     ], $atts, 'lean_cta' );
 
     $settings = get_plugin_settings();
 
     if ( empty( $settings['ctas'] ) ) {
+        return '';
+    }
+
+    // optin="1" → render the first configured opt-in form CTA directly,
+    // bypassing post/taxonomy matching. Used by the sitewide Daily Shot popup.
+    if ( ! empty( $atts['optin'] ) ) {
+        foreach ( $settings['ctas'] as $c ) {
+            if ( ( $c['button_type'] ?? '' ) === 'optin_form' ) {
+                return render( $c );
+            }
+        }
         return '';
     }
 

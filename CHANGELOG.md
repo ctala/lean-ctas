@@ -19,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **CLS prevention**: `min-height: 52px` reserved on the state container so switching form→success message does not cause layout shift.
 - Per-CTA fields: `optin_list_uuid` (Listmonk list UUID) and `optin_success_msg` (confirmation message shown after submit).
 - Admin: Listmonk URL global setting. Button type select shows/hides URL vs optin fields via inline JS.
+- **`position: manual`** — a CTA that is never auto-injected into content; rendered only via the shortcode `[lean_cta optin="1"]`. Enables placing the opt-in form in arbitrary locations such as a sitewide popup (`wp_footer`) without injecting it into every post body.
+- **`[lean_cta optin="1"]`** shortcode attribute: renders the first configured `optin_form` CTA directly, bypassing post/taxonomy matching. Styles + JS now load wherever an opt-in CTA may appear (not just singular pages), so the form works in a sitewide popup.
+- **`leanctas:subscribed` DOM event**: dispatched on `document` after a successful JS subscription, so external scripts (e.g. a popup) can auto-close and set a cookie. Replaces the Forminator-specific `forminator:form:submit:success` listener.
+- **Editable Listmonk API credentials** (`listmonk_api_user`, `listmonk_api_token`): stored server-side, never exposed to the browser. The subscription flow still uses the public endpoint (no auth); these are stored for cross-site reuse, surviving a Listmonk migration, and future admin features.
 
 ## [2.3.2] - 2026-03-26
 

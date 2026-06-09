@@ -31,6 +31,8 @@ function defaults(): array {
         'default_color'          => DEFAULT_COLOR,
         'post_types'             => [ 'post' ],
         'listmonk_url'           => '',
+        'listmonk_api_user'      => '',
+        'listmonk_api_token'     => '',
         'ctas'                   => [],
     ];
 }
@@ -87,6 +89,8 @@ function sanitize( mixed $input ): array {
     $clean['insert_after_paragraph'] = max( 1, (int) ( $input['insert_after_paragraph'] ?? 3 ) );
     $clean['default_color']          = sanitize_hex_color( $input['default_color'] ?? DEFAULT_COLOR ) ?: DEFAULT_COLOR;
     $clean['listmonk_url']           = esc_url_raw( rtrim( $input['listmonk_url'] ?? '', '/' ) );
+    $clean['listmonk_api_user']      = sanitize_text_field( $input['listmonk_api_user'] ?? '' );
+    $clean['listmonk_api_token']     = sanitize_text_field( $input['listmonk_api_token'] ?? '' );
 
     // Post types — accept only registered public types.
     $clean['post_types'] = [];
@@ -104,7 +108,7 @@ function sanitize( mixed $input ): array {
     }
 
     // CTAs.
-    $valid_positions = [ 'inline', 'end', 'both' ];
+    $valid_positions = [ 'inline', 'end', 'both', 'manual' ];
     $clean['ctas']   = [];
 
     if ( ! empty( $input['ctas'] ) && is_array( $input['ctas'] ) ) {

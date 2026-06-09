@@ -180,7 +180,30 @@ function render_page(): void {
                             placeholder="https://listmonk.example.com"
                             style="width:360px">
                         <p class="description">
-                            <?php esc_html_e( 'Base URL of your Listmonk instance. Used by opt-in form CTAs (no API credentials required — uses the public subscription endpoint).', 'lean-ctas' ); ?>
+                            <?php esc_html_e( 'Base URL of your Listmonk instance. Used by opt-in form CTAs. Editable so the same plugin works across sites and survives a Listmonk migration.', 'lean-ctas' ); ?>
+                        </p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row"><?php esc_html_e( 'Listmonk API user', 'lean-ctas' ); ?></th>
+                    <td>
+                        <input type="text"
+                            name="<?php echo esc_attr( OPTION_KEY ); ?>[listmonk_api_user]"
+                            value="<?php echo esc_attr( $settings['listmonk_api_user'] ?? '' ); ?>"
+                            autocomplete="off"
+                            style="width:360px">
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row"><?php esc_html_e( 'Listmonk API token', 'lean-ctas' ); ?></th>
+                    <td>
+                        <input type="password"
+                            name="<?php echo esc_attr( OPTION_KEY ); ?>[listmonk_api_token]"
+                            value="<?php echo esc_attr( $settings['listmonk_api_token'] ?? '' ); ?>"
+                            autocomplete="new-password"
+                            style="width:360px">
+                        <p class="description">
+                            <?php esc_html_e( 'Optional. The opt-in subscription flow uses the public endpoint (no auth). These credentials are stored for admin features / future use (e.g. fetching list names). Stored server-side, never sent to the browser.', 'lean-ctas' ); ?>
                         </p>
                     </td>
                 </tr>
@@ -319,6 +342,7 @@ function render_cta_row( int|string $i, array $cta, array $tax_options, array $p
                     <option value="inline" <?php selected( $cta['position'], 'inline' ); ?>>📍 <?php esc_html_e( 'Inline (after paragraph N)', 'lean-ctas' ); ?></option>
                     <option value="end"    <?php selected( $cta['position'], 'end' ); ?>>⬇️ <?php esc_html_e( 'End of post', 'lean-ctas' ); ?></option>
                     <option value="both"   <?php selected( $cta['position'], 'both' ); ?>>📍⬇️ <?php esc_html_e( 'Both', 'lean-ctas' ); ?></option>
+                    <option value="manual" <?php selected( $cta['position'], 'manual' ); ?>>🧩 <?php esc_html_e( 'Manual — shortcode only [lean_cta optin="1"]', 'lean-ctas' ); ?></option>
                 </select>
             </div>
             <div>
