@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.0] - 2026-06-09
+
+### Added
+- **Opt-in form mode** (`button_type: optin_form`): a CTA can now render an email capture form instead of a button link. Server-rendered `<form method="post">`, zero external dependencies, zero JS required.
+- **Listmonk integration**: opt-in forms POST to Listmonk's public `/api/public/subscription` endpoint. No API credentials needed — uses the unauthenticated public endpoint, which respects the list's double opt-in setting. Add your Listmonk base URL in Settings → Lean CTAs.
+- **No-JS fallback path** via `admin_post_nopriv_lc_subscribe`: works with full page reload, redirects back with `?lc_done=ok|err` query arg.
+- **Progressive enhancement JS** (~1.3 KB inline, vanilla, no jQuery): intercepted fetch submit that swaps the form for the success message without page reload. Only injected on pages with an active opt-in CTA. Falls back to POST if fetch fails or JS is disabled.
+- **Honeypot anti-spam**: off-screen hidden input (`lc_hp`) — bots fill it, humans don't see it. Rejection is silent (returns 200) to avoid leaking the mechanism.
+- **CLS prevention**: `min-height: 52px` reserved on the state container so switching form→success message does not cause layout shift.
+- Per-CTA fields: `optin_list_uuid` (Listmonk list UUID) and `optin_success_msg` (confirmation message shown after submit).
+- Admin: Listmonk URL global setting. Button type select shows/hides URL vs optin fields via inline JS.
+
 ## [2.3.2] - 2026-03-26
 
 ### Fixed
@@ -102,6 +114,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `[eco_cta]` shortcode
 - Mobile-first CSS with CSS custom properties
 
+[2.4.0]: https://github.com/ctala/lean-ctas/compare/v2.3.2...v2.4.0
 [2.3.2]: https://github.com/ctala/lean-ctas/compare/v2.3.1...v2.3.2
 [2.3.1]: https://github.com/ctala/lean-ctas/compare/v2.3.0...v2.3.1
 [2.3.0]: https://github.com/ctala/lean-ctas/compare/v2.2.0...v2.3.0

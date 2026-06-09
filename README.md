@@ -3,7 +3,7 @@
 [![WordPress](https://img.shields.io/badge/WordPress-6.4%2B-blue)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-8.1%2B-purple)](https://php.net/)
 [![License](https://img.shields.io/badge/License-GPL--2.0--or--later-green)](LICENSE)
-[![Version](https://img.shields.io/badge/version-2.3.1-orange)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2.4.0-orange)](CHANGELOG.md)
 
 Lightweight WordPress plugin that dynamically injects Call-to-Action blocks into your post content based on post type, taxonomy, or category. Zero dependencies, works with any theme.
 
@@ -17,6 +17,7 @@ Lightweight WordPress plugin that dynamically injects Call-to-Action blocks into
 - **Any taxonomy** — Categories, tags, custom taxonomies
 - **Shortcode** — `[lean_cta]` for manual placement
 - **Zero dependencies** — Pure PHP, no build tools, no external assets
+- **Opt-in form mode** — Email capture form integrated with Listmonk (double opt-in, no API credentials needed)
 
 ## Installation
 
@@ -113,6 +114,40 @@ Override with CSS custom properties:
 [lean_cta category="131"]         <!-- Force category -->
 ```
 
+## Opt-in Form Mode (v2.4.0+)
+
+A CTA can render an email capture form connected to [Listmonk](https://listmonk.app/) instead of a button link.
+
+### How it works
+
+1. Set **Button type** to "Opt-in form (Listmonk)" in the CTA row.
+2. Enter the **Listmonk List UUID** (Settings → Lean CTAs → CTA row → Listmonk List UUID). Find it in Listmonk → Lists → Edit.
+3. Set **Listmonk URL** in the global settings (e.g. `https://listmonk.nyx.cristiantala.com`). No user/token needed.
+4. Optionally customize the **Success message**.
+
+### Double opt-in
+
+The plugin sends to Listmonk's public endpoint (`/api/public/subscription`). If the target list is configured for double opt-in in Listmonk, Listmonk sends the confirmation email automatically. This is intentional — do not change to `/api/subscribers`.
+
+### No-JS fallback
+
+The form works with `<form method="post">` and a full page reload if JavaScript is disabled or unavailable. With JS, a ~1.3 KB vanilla fetch script intercepts the submit and swaps the form for the success message without reload.
+
+### Smoke test (staging)
+
+1. Install and activate plugin on a staging WP instance.
+2. Settings → Lean CTAs: set Listmonk URL to your staging Listmonk instance.
+3. Add a CTA: Button type = Opt-in form, List UUID = `<your list uuid>`, any title/text.
+4. View a post — the form renders server-side (check "View Source", no JS required).
+5. Disable JS in DevTools → submit form → page redirects back with `?lc_done=ok` → success message visible.
+6. Re-enable JS → submit form → success message swaps in without reload.
+7. Check Listmonk → Subscribers → the email appears (status "unconfirmed" if double opt-in is on, pending confirmation email).
+8. Confirm the confirmation email → subscriber becomes active.
+
+For Daily Shot (`ecosistemastartup.com`):
+- Listmonk URL: `https://listmonk.nyx.cristiantala.com`
+- List UUID: `2c6f425d-96d9-47b6-bc7b-761dd04e185f`
+
 ## Requirements
 
 - WordPress 6.4+
@@ -124,4 +159,4 @@ GPL-2.0-or-later
 
 ---
 
-Made with ❤️ from Chile by [cristiantala.com](https://cristiantala.com)
+Made with love from Chile by [cristiantala.com](https://cristiantala.com)
