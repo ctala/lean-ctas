@@ -171,6 +171,19 @@ function render_page(): void {
                         </p>
                     </td>
                 </tr>
+                <tr>
+                    <th scope="row"><?php esc_html_e( 'Listmonk URL', 'lean-ctas' ); ?></th>
+                    <td>
+                        <input type="url"
+                            name="<?php echo esc_attr( OPTION_KEY ); ?>[listmonk_url]"
+                            value="<?php echo esc_attr( $settings['listmonk_url'] ?? '' ); ?>"
+                            placeholder="https://listmonk.example.com"
+                            style="width:360px">
+                        <p class="description">
+                            <?php esc_html_e( 'Base URL of your Listmonk instance. Used by opt-in form CTAs (no API credentials required — uses the public subscription endpoint).', 'lean-ctas' ); ?>
+                        </p>
+                    </td>
+                </tr>
             </table>
 
             <h2 style="margin-top:2em"><?php esc_html_e( 'Configured CTAs', 'lean-ctas' ); ?></h2>
@@ -209,11 +222,30 @@ function render_page(): void {
     <script>
     (function(){
         let idx=<?php echo count( $settings['ctas'] ); ?>;
+
+        // Toggle URL vs optin fields based on button_type selection.
+        function syncOptinFields(row){
+            var sel=row.querySelector('.lean-btn-type-select');
+            if(!sel)return;
+            var isForm=sel.value==='optin_form';
+            row.querySelectorAll('.lean-field-url').forEach(function(el){el.style.display=isForm?'none':'';});
+            row.querySelectorAll('.lean-field-optin').forEach(function(el){el.style.display=isForm?'':'none';});
+        }
+
+        document.getElementById('lean-cta-list').addEventListener('change',function(e){
+            if(e.target.classList.contains('lean-btn-type-select')){
+                syncOptinFields(e.target.closest('.lean-cta-row'));
+            }
+        });
+
         document.getElementById('lean-add-cta').addEventListener('click',function(){
             const h=document.getElementById('lean-cta-template').innerHTML.replace(/__INDEX__/g,idx++);
             const d=document.createElement('div');d.innerHTML=h;
-            document.getElementById('lean-cta-list').appendChild(d.firstElementChild);
+            var row=d.firstElementChild;
+            document.getElementById('lean-cta-list').appendChild(row);
+            syncOptinFields(row);
         });
+
         document.getElementById('lean-cta-list').addEventListener('click',function(e){
             if(e.target.classList.contains('lean-remove-cta')){e.preventDefault();e.target.closest('.lean-cta-row').remove();}
         });
@@ -297,10 +329,12 @@ function render_cta_row( int|string $i, array $cta, array $tax_options, array $p
             </div>
             <div>
                 <label><?php esc_html_e( 'Button type', 'lean-ctas' ); ?></label>
-                <select name="<?php echo esc_attr( $n ); ?>[button_type]">
+                <select name="<?php echo esc_attr( $n ); ?>[button_type]" class="lean-btn-type-select"
+                    data-row="<?php echo esc_attr( (string) $i ); ?>">
                     <option value="link"       <?php selected( $cta['button_type'], 'link' ); ?>>🔗 <?php esc_html_e( 'External link', 'lean-ctas' ); ?></option>
                     <option value="newsletter" <?php selected( $cta['button_type'], 'newsletter' ); ?>>📧 <?php esc_html_e( 'Newsletter', 'lean-ctas' ); ?></option>
                     <option value="community"  <?php selected( $cta['button_type'], 'community' ); ?>>👥 <?php esc_html_e( 'Community', 'lean-ctas' ); ?></option>
+                    <option value="optin_form" <?php selected( $cta['button_type'], 'optin_form' ); ?>>✉️ <?php esc_html_e( 'Opt-in form (Listmonk)', 'lean-ctas' ); ?></option>
                 </select>
             </div>
             <div style="grid-column:span 2">
@@ -314,11 +348,26 @@ function render_cta_row( int|string $i, array $cta, array $tax_options, array $p
                     value="<?php echo esc_attr( $cta['button_label'] ); ?>"
                     placeholder="<?php esc_attr_e( 'e.g. Subscribe free', 'lean-ctas' ); ?>">
             </div>
-            <div>
+            <div class="lean-field-url" <?php echo $cta['button_type'] === 'optin_form' ? 'style="display:none"' : ''; ?>>
                 <label><?php esc_html_e( 'Button URL', 'lean-ctas' ); ?></label>
                 <input type="url" name="<?php echo esc_attr( $n ); ?>[button_url]"
                     value="<?php echo esc_attr( $cta['button_url'] ); ?>"
                     placeholder="https://...">
+            </div>
+            <div class="lean-field-optin" <?php echo $cta['button_type'] !== 'optin_form' ? 'style="display:none"' : ''; ?>>
+                <label><?php esc_html_e( 'Listmonk List UUID', 'lean-ctas' ); ?></label>
+                <input type="text" name="<?php echo esc_attr( $n ); ?>[optin_list_uuid]"
+                    value="<?php echo esc_attr( $cta['optin_list_uuid'] ?? '' ); ?>"
+                    placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+                <p class="description" style="font-size:11px;margin-top:4px">
+                    <?php esc_html_e( 'UUID of the Listmonk list. Found in Listmonk → Lists → Edit.', 'lean-ctas' ); ?>
+                </p>
+            </div>
+            <div class="lean-field-optin" style="grid-column:span 2;<?php echo $cta['button_type'] !== 'optin_form' ? 'display:none' : ''; ?>">
+                <label><?php esc_html_e( 'Success message', 'lean-ctas' ); ?></label>
+                <input type="text" name="<?php echo esc_attr( $n ); ?>[optin_success_msg]"
+                    value="<?php echo esc_attr( $cta['optin_success_msg'] ?? '' ); ?>"
+                    placeholder="<?php esc_attr_e( 'Check your email to confirm your subscription.', 'lean-ctas' ); ?>">
             </div>
         </div>
     </div>
