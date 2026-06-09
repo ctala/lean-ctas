@@ -8,6 +8,23 @@ declare( strict_types=1 );
  *   - No-JS path: admin_post_nopriv_lc_subscribe  (form POST → redirect)
  *   - JS path:    REST POST /lean-ctas/v1/subscribe (fetch → JSON)
  *
+ * Security model (no WP nonce — cache-safe design):
+ *   WP nonces expire in ~24h. Eco runs server-level page cache (WPMU DEV)
+ *   that can serve pages for days. A nonce baked into cached HTML would be
+ *   stale on the first cache hit after expiry, silently breaking every
+ *   subscription. For a public double opt-in form this tradeoff is wrong:
+ *   the nonce adds no meaningful security (an attacker can POST directly to
+ *   Listmonk's public endpoint anyway; the worst outcome is a confirmation
+ *   email the recipient never clicks), while the breakage is total and silent.
+ *
+ *   Protection comes from three layers instead:
+ *     1. Honeypot field (off-screen, bots fill it, humans don't).
+ *     2. UUID allowlist: submitted list_uuid must be one configured in
+ *        Settings → Lean CTAs. Prevents using this handler to subscribe
+ *        addresses to arbitrary Listmonk lists.
+ *     3. IP rate limit: max 10 submits per IP per 10 min (transient).
+ *        Limits email-bombing of third-party inboxes even if honeypot is bypassed.
+ *
  * Listmonk delivery uses the PUBLIC endpoint (no auth required):
  *   POST {listmonk_url}/api/public/subscription
  *   {"email":"…","list_uuids":["…"]}
@@ -28,6 +45,17 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 use function LeanCTAs\Helpers\get_plugin_settings;
+use function LeanCTAs\Helpers\get_configured_optin_uuids;
+use function LeanCTAs\Helpers\get_client_ip;
+
+/* ─────────────────────────────────────────────
+   Constants
+───────────────────────────────────────────── */
+
+/** Max submissions per IP within RATE_WINDOW seconds. */
+const RATE_LIMIT  = 10;
+/** Rate-limit window in seconds (10 minutes). */
+const RATE_WINDOW = 600;
 
 /* ─────────────────────────────────────────────
    Hooks
@@ -47,28 +75,35 @@ add_action( 'rest_api_init', __NAMESPACE__ . '\\register_rest_route' );
 
 /**
  * Handle the no-JS POST form submission.
- * Verifies nonce, honeypot, email; sends to Listmonk; redirects back.
+ * Checks honeypot, allowlist, rate limit, email; sends to Listmonk; redirects back.
  */
 function handle_post(): void {
-    // Nonce check.
-    if ( ! isset( $_POST['_lc_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['_lc_nonce'] ) ), 'lc_subscribe' ) ) {
-        redirect_back( 'err' );
-        return;
-    }
+    $referer = wp_get_referer() ?: home_url();
 
-    // Honeypot: reject if filled.
+    // Honeypot: reject if filled. Silent success so bots don't learn the field matters.
     if ( ! empty( $_POST['lc_hp'] ) ) {
-        // Silent success so bots don't learn the field matters.
-        redirect_back( 'ok' );
+        redirect_back( 'ok', $referer );
         return;
     }
 
-    $email    = sanitize_email( wp_unslash( $_POST['lc_email'] ?? '' ) );
+    $email     = sanitize_email( wp_unslash( $_POST['lc_email'] ?? '' ) );
     $list_uuid = sanitize_text_field( wp_unslash( $_POST['lc_list'] ?? '' ) );
-    $referer  = wp_get_referer() ?: home_url();
 
     if ( ! is_email( $email ) || empty( $list_uuid ) ) {
         redirect_back( 'err', $referer );
+        return;
+    }
+
+    // UUID allowlist: must be configured in plugin settings.
+    if ( ! in_array( $list_uuid, get_configured_optin_uuids(), true ) ) {
+        redirect_back( 'err', $referer );
+        return;
+    }
+
+    // Rate limit by IP.
+    if ( is_rate_limited() ) {
+        // Silent success — don't reveal the limit to scrapers.
+        redirect_back( 'ok', $referer );
         return;
     }
 
@@ -81,14 +116,10 @@ function handle_post(): void {
  * Redirect back to referring page with a status query arg.
  *
  * @param string $status 'ok' | 'err'.
- * @param string $url    Target URL (defaults to referer).
+ * @param string $url    Target URL.
  */
-function redirect_back( string $status, string $url = '' ): void {
-    if ( empty( $url ) ) {
-        $url = wp_get_referer() ?: home_url();
-    }
+function redirect_back( string $status, string $url ): void {
     $url = add_query_arg( 'lc_done', $status, $url );
-    // Remove the fragment so the browser scrolls to top, not to an anchor.
     wp_safe_redirect( $url );
     exit;
 }
@@ -107,7 +138,7 @@ function register_rest_route(): void {
         [
             'methods'             => \WP_REST_Server::CREATABLE,
             'callback'            => __NAMESPACE__ . '\\rest_subscribe',
-            'permission_callback' => '__return_true', // Public endpoint — auth is via nonce in body.
+            'permission_callback' => '__return_true', // Public endpoint — protected by allowlist + rate limit.
             'args'                => [
                 'email'     => [
                     'required'          => true,
@@ -116,11 +147,6 @@ function register_rest_route(): void {
                     'validate_callback' => 'is_email',
                 ],
                 'list_uuid' => [
-                    'required'          => true,
-                    'type'              => 'string',
-                    'sanitize_callback' => 'sanitize_text_field',
-                ],
-                'nonce' => [
                     'required'          => true,
                     'type'              => 'string',
                     'sanitize_callback' => 'sanitize_text_field',
@@ -143,19 +169,23 @@ function register_rest_route(): void {
  * @return \WP_REST_Response|\WP_Error
  */
 function rest_subscribe( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
-    // Nonce check (wp_rest nonce from wp_create_nonce('wp_rest')).
-    if ( ! wp_verify_nonce( $request->get_param( 'nonce' ), 'lc_subscribe' ) ) {
-        return new \WP_Error( 'invalid_nonce', __( 'Security check failed.', 'lean-ctas' ), [ 'status' => 403 ] );
-    }
-
     // Honeypot.
     if ( ! empty( $request->get_param( 'hp' ) ) ) {
-        // Return 200 so bots don't learn the field matters.
         return rest_ensure_response( [ 'success' => true ] );
     }
 
     $email     = $request->get_param( 'email' );
     $list_uuid = $request->get_param( 'list_uuid' );
+
+    // UUID allowlist.
+    if ( ! in_array( $list_uuid, get_configured_optin_uuids(), true ) ) {
+        return new \WP_Error( 'invalid_list', __( 'Invalid list.', 'lean-ctas' ), [ 'status' => 400 ] );
+    }
+
+    // Rate limit by IP. Silent 200 — don't signal the limit to scrapers.
+    if ( is_rate_limited() ) {
+        return rest_ensure_response( [ 'success' => true ] );
+    }
 
     $result = send_to_listmonk( $email, $list_uuid );
 
@@ -164,6 +194,45 @@ function rest_subscribe( \WP_REST_Request $request ): \WP_REST_Response|\WP_Erro
     }
 
     return rest_ensure_response( [ 'success' => true ] );
+}
+
+/* ─────────────────────────────────────────────
+   Rate limiting
+───────────────────────────────────────────── */
+
+/**
+ * Check (and increment) the per-IP submission counter.
+ *
+ * Uses a single transient per IP. On first call: sets counter=1, expiry=RATE_WINDOW.
+ * Subsequent calls within the window: increments in-place.
+ * Returns true if the IP has exceeded RATE_LIMIT within the current window.
+ *
+ * Transient key: lc_rl_{md5(ip)} — md5 to keep key length safe and avoid
+ * special chars from IPv6 addresses in option names.
+ *
+ * @return bool True = rate limited (should be blocked).
+ */
+function is_rate_limited(): bool {
+    $ip  = get_client_ip();
+    $key = 'lc_rl_' . md5( $ip );
+
+    $count = (int) get_transient( $key );
+
+    if ( $count >= RATE_LIMIT ) {
+        return true;
+    }
+
+    // Increment. On first hit, set_transient creates with RATE_WINDOW expiry.
+    // On subsequent hits within the window, get_transient already returned the
+    // existing value — we overwrite with count+1, preserving expiry via
+    // delete+set (WP transients reset TTL on set, so we calculate remaining time).
+    // Simpler approach: always set with full window on each increment.
+    // This slightly extends the window on repeated hits, but for a spam
+    // protection use-case that is acceptable — the attacker just gets
+    // a rolling 10-min window, not a fixed one.
+    set_transient( $key, $count + 1, RATE_WINDOW );
+
+    return false;
 }
 
 /* ─────────────────────────────────────────────
