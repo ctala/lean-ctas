@@ -4,21 +4,12 @@
 
 ### Files modified
 - `lean-ctas.php` — version bump 2.3.2 → 2.4.0; `require_once includes/subscribe.php`
-- `includes/helpers.php` — `defaults()` adds `listmonk_url`; `cta_defaults()` adds `optin_list_uuid`, `optin_success_msg`; `sanitize()` validates `optin_form` as allowed `button_type` and sanitizes the new fields
-- `includes/frontend.php` — `render()` dispatches to `render_optin()` for `button_type === optin_form`; new `render_optin()` function; `print_styles()` adds form CSS + conditional progressive-enhancement JS
+- `includes/helpers.php` — `defaults()` adds `listmonk_url`; `cta_defaults()` adds `optin_list_uuid`, `optin_success_msg`; `sanitize()` validates `optin_form` as allowed `button_type`; new `get_configured_optin_uuids()` allowlist helper; new `get_client_ip()` CF-aware IP helper
+- `includes/frontend.php` — `render()` dispatches to `render_optin()` for `button_type === optin_form`; new `render_optin()` function (no nonce); `print_styles()` adds form CSS + conditional progressive-enhancement JS (no nonce)
 - `includes/admin.php` — Listmonk URL global field in settings table; `optin_form` option in button_type select; `lean-field-optin` / `lean-field-url` conditional field rows; admin JS `syncOptinFields()` toggle
 
 ### Files created
-- `includes/subscribe.php` — subscription handler (no-JS POST + REST endpoint + Listmonk delivery)
-
-### LOC added (approx)
-- helpers.php: +14
-- frontend.php: +145
-- admin.php: +52
-- subscribe.php: +224 (new file)
-- lean-ctas.php: +3
-
-Total new LOC: ~438
+- `includes/subscribe.php` — subscription handler (no-JS POST + REST endpoint + UUID allowlist + IP rate limit + Listmonk delivery)
 
 ## Endpoints
 
@@ -26,12 +17,12 @@ Total new LOC: ~438
 ```
 POST /wp-admin/admin-post.php
 action=lc_subscribe
-_lc_nonce=<wp_nonce lc_subscribe>
 lc_email=<email>
 lc_list=<list_uuid>
 lc_hp=   (must be empty — honeypot)
 ```
 Redirects to `{referer}?lc_done=ok` or `?lc_done=err`.
+Note: no `_lc_nonce` field — see security model below.
 
 ### REST path (progressive enhancement)
 ```
@@ -41,11 +32,11 @@ Content-Type: application/json
 {
   "email": "user@example.com",
   "list_uuid": "2c6f425d-96d9-47b6-bc7b-761dd04e185f",
-  "nonce": "<wp_create_nonce('lc_subscribe')>",
   "hp": ""
 }
 ```
 Returns `{"success": true}` or a WP_Error JSON.
+Note: no `nonce` field — see security model below.
 
 ### Listmonk delivery (internal)
 ```
@@ -73,6 +64,16 @@ No auth. Respects list opt-in setting (double opt-in if configured).
 13. Success message: e.g. "Revisa tu email para confirmar la suscripción."
 14. Save Changes.
 
+## Security model — why no WP nonce
+
+WP nonces expire in ~24h. Eco runs server-level page cache (WPMU DEV) that serves cached HTML for days. A nonce baked into the rendered form would be stale on the first cache hit past its expiry, silently rejecting every subscription attempt until the cache is purged.
+
+For a public double opt-in form, the nonce adds no meaningful security: the worst an attacker can do is cause Listmonk to send a confirmation email to an address — which the recipient must click to become a subscriber. An attacker bypassing the WP handler could POST directly to Listmonk's public endpoint with the same result. The protection that actually matters is:
+
+1. **Honeypot**: off-screen text input. Bots fill it, humans don't see it. Silent "ok" on trigger so bots don't learn it exists.
+2. **UUID allowlist** (`get_configured_optin_uuids()`): the submitted `list_uuid` must be one of the UUIDs configured in plugin settings. Prevents using this handler as a proxy to subscribe addresses to arbitrary Listmonk lists not belonging to this site.
+3. **IP rate limit**: max 10 submits per IP per 10 minutes (transient-based, `lc_rl_{md5(ip)}`). Respects Cloudflare's `CF-Connecting-IP` header via `get_client_ip()`. Limits email-bombing of third-party inboxes even if the honeypot is bypassed by a human attacker. Returns silent 200 so the limit is not detectable.
+
 ## Design decisions
 
 **button_type = optin_form (not a new `mode` field)**
@@ -85,7 +86,7 @@ The existing `button_type` field already describes the button behavior. Adding `
 `/api/public/subscription` requires no auth and triggers the list's native double opt-in flow. Using `/api/subscribers` with `preconfirm_subscriptions: true` would bypass double opt-in and require admin credentials in the frontend path — both wrong. The Listmonk URL is stored in wp_options (server-side only), never exposed to the browser.
 
 **Progressive enhancement is inline, conditional**
-The ~1.3 KB JS is injected inline in `<head>` only on pages where at least one `optin_form` CTA is configured. If no opt-in CTA exists, zero JS is added. This keeps the 0-JS-frontend principle intact for pages without forms.
+The ~1.2 KB JS (nonce removed) is injected inline in `<head>` only on pages where at least one `optin_form` CTA is configured. If no opt-in CTA exists, zero JS is added. This keeps the 0-JS-frontend principle intact for pages without forms.
 
 **CLS prevention**
 `min-height: 52px` on `.lean-cta-optin-state` reserves the height of the input row before the DOM swap. Prevents layout shift when the form is replaced by the success message.
@@ -93,8 +94,8 @@ The ~1.3 KB JS is injected inline in `<head>` only on pages where at least one `
 **Honeypot implementation**
 Off-screen `<span aria-hidden="true" style="position:absolute;left:-9999px;...">` wraps the honeypot input. Not `display:none` or `visibility:hidden` (those are trivially detectable by modern bots). The honeypot input has `tabindex="-1"` so keyboard users cannot focus it accidentally.
 
-**Rate limiting: omitted**
-A transient-based IP rate limit would add complexity (db write per request) for marginal anti-spam benefit given the honeypot already covers bots. Listmonk itself deduplicates subscriptions. Can be added later if needed.
+**Rate limit: rolling window, not fixed**
+`set_transient` resets TTL on every increment. A persistent submitter gets a rolling 10-min window instead of a fixed one. Acceptable for spam protection — the marginal difference (attacker could submit 10 every 10 min instead of 10 per fixed window) is negligible given Listmonk's double opt-in means each submission only triggers a confirmation email, not a live subscription.
 
 **HTTP 400/409 from Listmonk treated as success**
 If the email is already subscribed (409) or the list sends a 400 for various reasons (already pending, etc.), the public endpoint behavior is to resend the confirmation email. From the user's perspective, this is success ("check your email"). Treating 4xx < 500 as success is deliberate.
