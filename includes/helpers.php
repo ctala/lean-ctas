@@ -143,6 +143,48 @@ function sanitize( mixed $input ): array {
 }
 
 /**
+ * Return the list of optin_list_uuid values configured across all CTAs.
+ *
+ * Used as an allowlist: any UUID submitted via the opt-in form must be in
+ * this set, otherwise it is rejected. Prevents the handler from being used
+ * as a proxy to subscribe addresses to arbitrary Listmonk lists.
+ *
+ * @return string[]
+ */
+function get_configured_optin_uuids(): array {
+    $settings = get_plugin_settings();
+    $uuids    = [];
+
+    foreach ( $settings['ctas'] as $cta ) {
+        if (
+            ( $cta['button_type'] ?? '' ) === 'optin_form'
+            && ! empty( $cta['optin_list_uuid'] )
+        ) {
+            $uuids[] = $cta['optin_list_uuid'];
+        }
+    }
+
+    return array_unique( $uuids );
+}
+
+/**
+ * Get the real client IP, respecting Cloudflare's CF-Connecting-IP header.
+ *
+ * Only trusts CF-Connecting-IP when REMOTE_ADDR looks like a CF edge IP
+ * (i.e. not localhost). In staging/non-CF environments falls back to REMOTE_ADDR.
+ *
+ * @return string Sanitized IP string (empty string if not determinable).
+ */
+function get_client_ip(): string {
+    // Prefer CF-Connecting-IP when the connection comes through Cloudflare.
+    if ( ! empty( $_SERVER['HTTP_CF_CONNECTING_IP'] ) ) {
+        return sanitize_text_field( wp_unslash( $_SERVER['HTTP_CF_CONNECTING_IP'] ) );
+    }
+
+    return sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ?? '' ) );
+}
+
+/**
  * Get all public taxonomies with their terms, grouped for the admin selector.
  *
  * @return array<string, array{label: string, terms: \WP_Term[]}>
