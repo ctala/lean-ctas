@@ -3,7 +3,7 @@
  * Plugin Name:       Lean CTAs
  * Plugin URI:        https://github.com/ctala/lean-ctas
  * Description:       Lightweight dynamic CTAs injected into post content by post type, taxonomy, or category. Zero dependencies.
- * Version:           2.3.2
+ * Version:           2.4.0
  * Requires at least: 6.4
  * Requires PHP:      8.1
  * Author:            Cristian Tala
@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-const VERSION    = '2.3.2';
+const VERSION    = '2.4.0';
 const OPTION_KEY = 'lean_ctas_settings';
 const SLUG       = 'lean-ctas';
 
@@ -32,6 +32,7 @@ const SLUG       = 'lean-ctas';
 require_once __DIR__ . '/includes/helpers.php';
 require_once __DIR__ . '/includes/admin.php';
 require_once __DIR__ . '/includes/frontend.php';
+require_once __DIR__ . '/includes/subscribe.php';
 
 register_activation_hook( __FILE__, __NAMESPACE__ . '\\activate' );
 
