@@ -212,6 +212,10 @@ function insert_after_paragraph( string $content, string $injection, int $after 
  * @return string HTML.
  */
 function render( array $cta ): string {
+    if ( ( $cta['button_type'] ?? 'link' ) === 'optin_form' ) {
+        return render_optin( $cta );
+    }
+
     $settings = get_plugin_settings();
     $accent   = esc_attr( $cta['accent_color'] ?: ( $settings['default_color'] ?? '#FF6B35' ) );
     $title  = esc_html( $cta['title'] ?? '' );
@@ -241,6 +245,92 @@ function render( array $cta ): string {
     return $html;
 }
 
+/**
+ * Render an opt-in form CTA block.
+ *
+ * Server-rendered, 0 external dependencies. Works via POST (no-JS path).
+ * Progressive enhancement handled by inline JS in print_styles().
+ *
+ * Height of the state area is reserved via min-height to prevent CLS.
+ *
+ * @param array<string, mixed> $cta CTA data.
+ * @return string HTML.
+ */
+function render_optin( array $cta ): string {
+    $settings    = get_plugin_settings();
+    $accent      = esc_attr( $cta['accent_color'] ?: ( $settings['default_color'] ?? '#FF6B35' ) );
+    $title       = esc_html( $cta['title'] ?? '' );
+    $text        = esc_html( $cta['text'] ?? '' );
+    $label       = esc_html( $cta['button_label'] ?: __( 'Subscribe', 'lean-ctas' ) );
+    $list_uuid   = esc_attr( $cta['optin_list_uuid'] ?? '' );
+    $success_msg = esc_html( $cta['optin_success_msg'] ?: __( 'Check your email to confirm your subscription.', 'lean-ctas' ) );
+
+    // Detect state from query arg (no-JS path redirect result).
+    // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only display flag, no data change.
+    $done = isset( $_GET['lc_done'] ) ? sanitize_key( $_GET['lc_done'] ) : '';
+
+    // Nonce for form submission.
+    $nonce_field = wp_nonce_field( 'lc_subscribe', '_lc_nonce', true, false );
+
+    $action_url = esc_url( admin_url( 'admin-post.php' ) );
+
+    $html = '<div class="lean-cta-block lean-cta-optin" style="--lean-accent:' . $accent . '">';
+
+    if ( $title ) {
+        $html .= '<p class="lean-cta-title">' . $title . '</p>';
+    }
+    if ( $text ) {
+        $html .= '<p class="lean-cta-text">' . $text . '</p>';
+    }
+
+    // State area: reserved height prevents CLS when switching form ↔ success message.
+    // min-height matches form row height (~44px input + gap).
+    $html .= '<div class="lean-cta-optin-state" style="min-height:52px">';
+
+    if ( 'ok' === $done ) {
+        // Success state (no-JS redirect landed here).
+        $html .= '<p class="lean-cta-optin-success" role="status">' . $success_msg . '</p>';
+    } else {
+        // Form state — renders even if $list_uuid is empty (graceful degradation).
+        $html .= '<form class="lean-cta-optin-form" method="post" action="' . $action_url . '" novalidate'
+               . ' data-list="' . $list_uuid . '"'
+               . ' data-success="' . $success_msg . '">';
+        $html .= '<input type="hidden" name="action" value="lc_subscribe">';
+        $html .= $nonce_field;
+        $html .= '<input type="hidden" name="lc_list" value="' . $list_uuid . '">';
+
+        // Honeypot: positioned off-screen so screen readers/bots see it but visual users don't.
+        $html .= '<span aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden">'
+               . '<label for="lc_hp_field">' . esc_html__( 'Leave this field blank', 'lean-ctas' ) . '</label>'
+               . '<input type="text" id="lc_hp_field" name="lc_hp" value="" autocomplete="off" tabindex="-1">'
+               . '</span>';
+
+        $html .= '<div class="lean-cta-optin-row">';
+        $html .= '<label for="lc_email_' . esc_attr( $list_uuid ) . '" class="screen-reader-text">'
+               . esc_html__( 'Email address', 'lean-ctas' )
+               . '</label>';
+        $html .= '<input type="email" id="lc_email_' . esc_attr( $list_uuid ) . '" name="lc_email"'
+               . ' placeholder="' . esc_attr__( 'your@email.com', 'lean-ctas' ) . '"'
+               . ' aria-label="' . esc_attr__( 'Email address', 'lean-ctas' ) . '"'
+               . ' required autocomplete="email">';
+        $html .= '<button type="submit" class="lean-cta-btn">' . $label . '</button>';
+        $html .= '</div>';
+
+        if ( 'err' === $done ) {
+            $html .= '<p class="lean-cta-optin-error" role="alert">'
+                   . esc_html__( 'Something went wrong. Please try again.', 'lean-ctas' )
+                   . '</p>';
+        }
+
+        $html .= '</form>';
+    }
+
+    $html .= '</div>'; // .lean-cta-optin-state
+    $html .= '</div>'; // .lean-cta-block
+
+    return $html;
+}
+
 /* ─────────────────────────────────────────────
    Frontend styles
 ───────────────────────────────────────────── */
@@ -256,18 +346,71 @@ function print_styles(): void {
         return;
     }
 
+    // Detect if any optin_form CTA could be active on this page (for JS decision).
+    $has_optin = false;
+    foreach ( $settings['ctas'] as $cta ) {
+        if ( ( $cta['button_type'] ?? '' ) === 'optin_form' ) {
+            $has_optin = true;
+            break;
+        }
+    }
+
+    // REST nonce for JS path. Only generated when needed (no overhead otherwise).
+    $rest_nonce = $has_optin ? wp_create_nonce( 'lc_subscribe' ) : '';
+    $rest_url   = $has_optin ? esc_url( rest_url( 'lean-ctas/v1/subscribe' ) ) : '';
+
     ?>
     <style id="lean-cta-styles">
     .lean-cta-block{--lean-accent:<?php echo esc_attr( $settings['default_color'] ?? '#FF6B35' ); ?>;--lean-bg:rgba(0,0,0,.04);--lean-title:#111;--lean-text:#444;border-left:4px solid var(--lean-accent);background:var(--lean-bg);padding:16px 20px;margin:28px 0;border-radius:0 6px 6px 0;font-family:inherit}
     .lean-cta-title{font-weight:700;font-size:1.05em;margin:0 0 6px;color:var(--lean-title)}
     .lean-cta-text{margin:0 0 12px;color:var(--lean-text);font-size:.95em;line-height:1.5}
-    .lean-cta-btn{display:inline-block;background:var(--lean-accent);color:#fff!important;padding:8px 18px;border-radius:4px;text-decoration:none!important;font-weight:600;font-size:.9em;transition:opacity .2s}
+    .lean-cta-btn{display:inline-block;background:var(--lean-accent);color:#fff!important;padding:8px 18px;border-radius:4px;text-decoration:none!important;font-weight:600;font-size:.9em;transition:opacity .2s;border:none;cursor:pointer;line-height:1.4}
     .lean-cta-btn:hover{opacity:.85}
     .dark .lean-cta-block,[data-theme=dark] .lean-cta-block,[data-color-scheme=dark] .lean-cta-block,.lean-cta-dark{--lean-bg:rgba(255,255,255,.06);--lean-title:rgba(255,255,255,.92);--lean-text:rgba(255,255,255,.7)}
-    @media(max-width:600px){.lean-cta-btn{display:block;text-align:center}}
+    .lean-cta-optin-row{display:flex;gap:8px;align-items:stretch;flex-wrap:wrap}
+    .lean-cta-optin-row input[type=email]{flex:1 1 200px;min-width:0;padding:8px 12px;border:1px solid #ccc;border-radius:4px;font-size:.9em;font-family:inherit;background:transparent;color:inherit;box-sizing:border-box}
+    .lean-cta-optin-row input[type=email]:focus{outline:2px solid var(--lean-accent);outline-offset:1px;border-color:transparent}
+    .lean-cta-optin-success{margin:0;font-weight:600;color:var(--lean-title);font-size:.95em}
+    .lean-cta-optin-error{margin:6px 0 0;font-size:.85em;color:#c00}
+    .screen-reader-text{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+    @media(max-width:600px){.lean-cta-btn{display:block;text-align:center}.lean-cta-optin-row{flex-direction:column}.lean-cta-optin-row .lean-cta-btn{width:100%}}
     </style>
     <script>document.addEventListener('DOMContentLoaded',function(){var b=getComputedStyle(document.body).backgroundColor,m=b.match(/\d+/g);if(m&&m.length>=3){var l=(.299*m[0]+.587*m[1]+.114*m[2]);if(l<128)document.querySelectorAll('.lean-cta-block').forEach(function(e){e.classList.add('lean-cta-dark')})}})</script>
     <?php
+
+    // Progressive-enhancement JS for optin forms — only injected when needed.
+    // Intercepts submit, posts to REST, swaps form for success message without reload.
+    // Falls back to normal POST if JS is disabled or fetch fails.
+    if ( $has_optin ) :
+    ?>
+    <script>
+    (function(){
+    var N=<?php echo wp_json_encode( $rest_nonce ); ?>,U=<?php echo wp_json_encode( $rest_url ); ?>;
+    document.addEventListener('submit',function(e){
+        var f=e.target;
+        if(!f.classList.contains('lean-cta-optin-form'))return;
+        e.preventDefault();
+        var em=f.querySelector('[name=lc_email]'),btn=f.querySelector('[type=submit]');
+        if(!em||!em.value)return;
+        btn.disabled=true;
+        fetch(U,{method:'POST',headers:{'Content-Type':'application/json','X-WP-Nonce':N},
+            body:JSON.stringify({email:em.value,list_uuid:f.dataset.list,nonce:N,hp:''})})
+        .then(function(r){return r.json()})
+        .then(function(d){
+            var s=f.closest('.lean-cta-optin-state');
+            if(d.success&&s){s.innerHTML='<p class="lean-cta-optin-success" role="status">'+
+                (f.dataset.success||'Check your email to confirm.')+
+            '</p>'}else{btn.disabled=false;var err=f.querySelector('.lean-cta-optin-error');
+            if(err)err.style.display='';else{var p=document.createElement('p');
+            p.className='lean-cta-optin-error';p.setAttribute('role','alert');
+            p.textContent='Something went wrong. Please try again.';f.appendChild(p);}}
+        })
+        .catch(function(){btn.disabled=false;f.submit()});
+    });
+    })();
+    </script>
+    <?php
+    endif;
 }
 
 /* ─────────────────────────────────────────────
