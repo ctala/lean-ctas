@@ -269,9 +269,12 @@ function render_optin( array $cta ): string {
     // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only display flag, no data change.
     $done = isset( $_GET['lc_done'] ) ? sanitize_key( $_GET['lc_done'] ) : '';
 
-    // Nonce for form submission.
-    $nonce_field = wp_nonce_field( 'lc_subscribe', '_lc_nonce', true, false );
-
+    // No WP nonce: eco runs server-level page cache (WPMU DEV) that can serve
+    // pages for days. A nonce baked into cached HTML expires in ~24h, silently
+    // breaking every subscription attempt on stale cache. For a public double
+    // opt-in form the nonce adds no real security (attacker can POST to
+    // Listmonk's public endpoint directly regardless). Protection is provided
+    // by the UUID allowlist + honeypot + IP rate limit in subscribe.php.
     $action_url = esc_url( admin_url( 'admin-post.php' ) );
 
     $html = '<div class="lean-cta-block lean-cta-optin" style="--lean-accent:' . $accent . '">';
@@ -296,7 +299,6 @@ function render_optin( array $cta ): string {
                . ' data-list="' . $list_uuid . '"'
                . ' data-success="' . $success_msg . '">';
         $html .= '<input type="hidden" name="action" value="lc_subscribe">';
-        $html .= $nonce_field;
         $html .= '<input type="hidden" name="lc_list" value="' . $list_uuid . '">';
 
         // Honeypot: positioned off-screen so screen readers/bots see it but visual users don't.
@@ -355,9 +357,10 @@ function print_styles(): void {
         }
     }
 
-    // REST nonce for JS path. Only generated when needed (no overhead otherwise).
-    $rest_nonce = $has_optin ? wp_create_nonce( 'lc_subscribe' ) : '';
-    $rest_url   = $has_optin ? esc_url( rest_url( 'lean-ctas/v1/subscribe' ) ) : '';
+    // No nonce: cached pages would serve a stale nonce after ~24h, silently
+    // breaking subscriptions. Protection is via UUID allowlist + honeypot + IP
+    // rate limit. See subscribe.php for the full security rationale.
+    $rest_url = $has_optin ? esc_url( rest_url( 'lean-ctas/v1/subscribe' ) ) : '';
 
     ?>
     <style id="lean-cta-styles">
@@ -385,7 +388,7 @@ function print_styles(): void {
     ?>
     <script>
     (function(){
-    var N=<?php echo wp_json_encode( $rest_nonce ); ?>,U=<?php echo wp_json_encode( $rest_url ); ?>;
+    var U=<?php echo wp_json_encode( $rest_url ); ?>;
     document.addEventListener('submit',function(e){
         var f=e.target;
         if(!f.classList.contains('lean-cta-optin-form'))return;
@@ -393,8 +396,8 @@ function print_styles(): void {
         var em=f.querySelector('[name=lc_email]'),btn=f.querySelector('[type=submit]');
         if(!em||!em.value)return;
         btn.disabled=true;
-        fetch(U,{method:'POST',headers:{'Content-Type':'application/json','X-WP-Nonce':N},
-            body:JSON.stringify({email:em.value,list_uuid:f.dataset.list,nonce:N,hp:''})})
+        fetch(U,{method:'POST',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({email:em.value,list_uuid:f.dataset.list,hp:''})})
         .then(function(r){return r.json()})
         .then(function(d){
             var s=f.closest('.lean-cta-optin-state');
