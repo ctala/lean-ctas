@@ -30,6 +30,7 @@ function defaults(): array {
         'insert_after_paragraph' => 3,
         'default_color'          => DEFAULT_COLOR,
         'post_types'             => [ 'post' ],
+        'listmonk_url'           => '',
         'ctas'                   => [],
     ];
 }
@@ -53,16 +54,19 @@ function get_plugin_settings(): array {
  */
 function cta_defaults(): array {
     return [
-        'post_type'    => '',
-        'taxonomy'     => '',
-        'term_id'      => 0,
-        'title'        => '',
-        'text'         => '',
-        'button_label' => '',
-        'button_url'   => '',
-        'button_type'  => 'link',
-        'accent_color' => '',
-        'position'     => 'inline',
+        'post_type'            => '',
+        'taxonomy'             => '',
+        'term_id'              => 0,
+        'title'                => '',
+        'text'                 => '',
+        'button_label'         => '',
+        'button_url'           => '',
+        'button_type'          => 'link',
+        'accent_color'         => '',
+        'position'             => 'inline',
+        // Opt-in form fields (only used when button_type = 'optin_form').
+        'optin_list_uuid'      => '',
+        'optin_success_msg'    => '',
     ];
 }
 
@@ -82,6 +86,7 @@ function sanitize( mixed $input ): array {
     $clean['enabled']                = ! empty( $input['enabled'] );
     $clean['insert_after_paragraph'] = max( 1, (int) ( $input['insert_after_paragraph'] ?? 3 ) );
     $clean['default_color']          = sanitize_hex_color( $input['default_color'] ?? DEFAULT_COLOR ) ?: DEFAULT_COLOR;
+    $clean['listmonk_url']           = esc_url_raw( rtrim( $input['listmonk_url'] ?? '', '/' ) );
 
     // Post types — accept only registered public types.
     $clean['post_types'] = [];
@@ -110,17 +115,26 @@ function sanitize( mixed $input ): array {
 
             $position = sanitize_key( $cta['position'] ?? 'inline' );
 
+            $button_type        = sanitize_key( $cta['button_type'] ?? 'link' );
+            $valid_button_types = [ 'link', 'newsletter', 'community', 'optin_form' ];
+            if ( ! in_array( $button_type, $valid_button_types, true ) ) {
+                $button_type = 'link';
+            }
+
             $clean['ctas'][] = [
-                'post_type'    => sanitize_key( $cta['post_type'] ?? '' ),
-                'taxonomy'     => sanitize_key( $cta['taxonomy'] ?? '' ),
-                'term_id'      => (int) ( $cta['term_id'] ?? 0 ),
-                'title'        => sanitize_text_field( $cta['title'] ?? '' ),
-                'text'         => sanitize_textarea_field( $cta['text'] ?? '' ),
-                'button_label' => sanitize_text_field( $cta['button_label'] ?? '' ),
-                'button_url'   => esc_url_raw( $cta['button_url'] ?? '' ),
-                'button_type'  => sanitize_key( $cta['button_type'] ?? 'link' ),
-                'accent_color' => sanitize_hex_color( $cta['accent_color'] ?? '' ) ?: '',
-                'position'     => in_array( $position, $valid_positions, true ) ? $position : 'inline',
+                'post_type'         => sanitize_key( $cta['post_type'] ?? '' ),
+                'taxonomy'          => sanitize_key( $cta['taxonomy'] ?? '' ),
+                'term_id'           => (int) ( $cta['term_id'] ?? 0 ),
+                'title'             => sanitize_text_field( $cta['title'] ?? '' ),
+                'text'              => sanitize_textarea_field( $cta['text'] ?? '' ),
+                'button_label'      => sanitize_text_field( $cta['button_label'] ?? '' ),
+                'button_url'        => esc_url_raw( $cta['button_url'] ?? '' ),
+                'button_type'       => $button_type,
+                'accent_color'      => sanitize_hex_color( $cta['accent_color'] ?? '' ) ?: '',
+                'position'          => in_array( $position, $valid_positions, true ) ? $position : 'inline',
+                // Opt-in form fields.
+                'optin_list_uuid'   => sanitize_text_field( $cta['optin_list_uuid'] ?? '' ),
+                'optin_success_msg' => sanitize_text_field( $cta['optin_success_msg'] ?? '' ),
             ];
         }
     }
