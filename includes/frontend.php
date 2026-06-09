@@ -269,8 +269,10 @@ function render_optin( array $cta ): string {
     $title       = esc_html( $cta['title'] ?? '' );
     $text        = esc_html( $cta['text'] ?? '' );
     $label       = esc_html( $cta['button_label'] ?: __( 'Subscribe', 'lean-ctas' ) );
-    $list_uuid   = esc_attr( $cta['optin_list_uuid'] ?? '' );
+    $list_uuid   = esc_attr( $cta['optin_list_uuid'] ?? '' );  // may be "uuid1,uuid2" — handler splits it.
     $success_msg = esc_html( $cta['optin_success_msg'] ?: __( 'Check your email to confirm your subscription.', 'lean-ctas' ) );
+    // Unique per render so popup + after-post-content instances don't collide on element IDs.
+    $uid         = esc_attr( wp_unique_id( 'lc' ) );
 
     // Detect state from query arg (no-JS path redirect result).
     // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only display flag, no data change.
@@ -310,15 +312,15 @@ function render_optin( array $cta ): string {
 
         // Honeypot: positioned off-screen so screen readers/bots see it but visual users don't.
         $html .= '<span aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden">'
-               . '<label for="lc_hp_field">' . esc_html__( 'Leave this field blank', 'lean-ctas' ) . '</label>'
-               . '<input type="text" id="lc_hp_field" name="lc_hp" value="" autocomplete="off" tabindex="-1">'
+               . '<label for="lc_hp_' . $uid . '">' . esc_html__( 'Leave this field blank', 'lean-ctas' ) . '</label>'
+               . '<input type="text" id="lc_hp_' . $uid . '" name="lc_hp" value="" autocomplete="off" tabindex="-1">'
                . '</span>';
 
         $html .= '<div class="lean-cta-optin-row">';
-        $html .= '<label for="lc_email_' . esc_attr( $list_uuid ) . '" class="screen-reader-text">'
+        $html .= '<label for="lc_email_' . $uid . '" class="screen-reader-text">'
                . esc_html__( 'Email address', 'lean-ctas' )
                . '</label>';
-        $html .= '<input type="email" id="lc_email_' . esc_attr( $list_uuid ) . '" name="lc_email"'
+        $html .= '<input type="email" id="lc_email_' . $uid . '" name="lc_email"'
                . ' placeholder="' . esc_attr__( 'your@email.com', 'lean-ctas' ) . '"'
                . ' aria-label="' . esc_attr__( 'Email address', 'lean-ctas' ) . '"'
                . ' required autocomplete="email">';

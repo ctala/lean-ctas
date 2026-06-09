@@ -164,11 +164,24 @@ function get_configured_optin_uuids(): array {
             ( $cta['button_type'] ?? '' ) === 'optin_form'
             && ! empty( $cta['optin_list_uuid'] )
         ) {
-            $uuids[] = $cta['optin_list_uuid'];
+            // optin_list_uuid may be a single UUID or several comma-separated
+            // (matches the old Forminator addon behaviour of one form → many lists).
+            $uuids = array_merge( $uuids, parse_uuid_list( $cta['optin_list_uuid'] ) );
         }
     }
 
-    return array_unique( $uuids );
+    return array_values( array_unique( $uuids ) );
+}
+
+/**
+ * Parse a comma-separated list of Listmonk list UUIDs into a clean array.
+ *
+ * @param string $raw Raw value (one UUID or "uuid1,uuid2,…").
+ * @return array<string>
+ */
+function parse_uuid_list( string $raw ): array {
+    $parts = array_map( 'trim', explode( ',', $raw ) );
+    return array_values( array_filter( $parts, static fn( $p ) => $p !== '' ) );
 }
 
 /**

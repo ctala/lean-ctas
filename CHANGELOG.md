@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.1] - 2026-06-09
+
+### Added
+- **Multi-list opt-in**: a CTA's `optin_list_uuid` now accepts several comma-separated Listmonk list UUIDs (`uuid1,uuid2`). The subscription is sent to all of them via `list_uuids` (matches the old Forminator addon behaviour of one form → many lists, e.g. Daily Shot + Eco). `get_configured_optin_uuids()` and the submit handlers split + allowlist each UUID individually. New `parse_uuid_list()` helper.
+
+### Fixed
+- **Duplicate element IDs**: the opt-in form's email/honeypot inputs used static IDs, so rendering the same opt-in CTA twice on a page (e.g. sitewide popup + after-post-content element) produced duplicate `id` attributes and ambiguous `<label for>`. Now uses `wp_unique_id()` per render.
+
 ## [2.4.0] - 2026-06-09
 
 ### Added

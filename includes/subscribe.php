@@ -46,6 +46,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 use function LeanCTAs\Helpers\get_plugin_settings;
 use function LeanCTAs\Helpers\get_configured_optin_uuids;
+use function LeanCTAs\Helpers\parse_uuid_list;
 use function LeanCTAs\Helpers\get_client_ip;
 
 /* ─────────────────────────────────────────────
@@ -86,18 +87,22 @@ function handle_post(): void {
         return;
     }
 
-    $email     = sanitize_email( wp_unslash( $_POST['lc_email'] ?? '' ) );
-    $list_uuid = sanitize_text_field( wp_unslash( $_POST['lc_list'] ?? '' ) );
+    $email = sanitize_email( wp_unslash( $_POST['lc_email'] ?? '' ) );
+    // lc_list may carry one or several comma-separated list UUIDs.
+    $uuids = parse_uuid_list( sanitize_text_field( wp_unslash( $_POST['lc_list'] ?? '' ) ) );
 
-    if ( ! is_email( $email ) || empty( $list_uuid ) ) {
+    if ( ! is_email( $email ) || empty( $uuids ) ) {
         redirect_back( 'err', $referer );
         return;
     }
 
-    // UUID allowlist: must be configured in plugin settings.
-    if ( ! in_array( $list_uuid, get_configured_optin_uuids(), true ) ) {
-        redirect_back( 'err', $referer );
-        return;
+    // UUID allowlist: every submitted UUID must be configured in plugin settings.
+    $allowed = get_configured_optin_uuids();
+    foreach ( $uuids as $u ) {
+        if ( ! in_array( $u, $allowed, true ) ) {
+            redirect_back( 'err', $referer );
+            return;
+        }
     }
 
     // Rate limit by IP.
@@ -107,7 +112,7 @@ function handle_post(): void {
         return;
     }
 
-    $result = send_to_listmonk( $email, $list_uuid );
+    $result = send_to_listmonk( $email, $uuids );
 
     redirect_back( is_wp_error( $result ) ? 'err' : 'ok', $referer );
 }
@@ -179,12 +184,20 @@ function rest_subscribe( \WP_REST_Request $request ): \WP_REST_Response|\WP_Erro
         return rest_ensure_response( [ 'success' => true ] );
     }
 
-    $email     = $request->get_param( 'email' );
-    $list_uuid = $request->get_param( 'list_uuid' );
+    $email = $request->get_param( 'email' );
+    // list_uuid may carry one or several comma-separated list UUIDs.
+    $uuids = parse_uuid_list( (string) $request->get_param( 'list_uuid' ) );
 
-    // UUID allowlist.
-    if ( ! in_array( $list_uuid, get_configured_optin_uuids(), true ) ) {
+    if ( empty( $uuids ) ) {
         return new \WP_Error( 'invalid_list', __( 'Invalid list.', 'lean-ctas' ), [ 'status' => 400 ] );
+    }
+
+    // UUID allowlist: every submitted UUID must be configured.
+    $allowed = get_configured_optin_uuids();
+    foreach ( $uuids as $u ) {
+        if ( ! in_array( $u, $allowed, true ) ) {
+            return new \WP_Error( 'invalid_list', __( 'Invalid list.', 'lean-ctas' ), [ 'status' => 400 ] );
+        }
     }
 
     // Rate limit by IP. Silent 200 — don't signal the limit to scrapers.
@@ -192,7 +205,7 @@ function rest_subscribe( \WP_REST_Request $request ): \WP_REST_Response|\WP_Erro
         return rest_ensure_response( [ 'success' => true ] );
     }
 
-    $result = send_to_listmonk( $email, $list_uuid );
+    $result = send_to_listmonk( $email, $uuids );
 
     if ( is_wp_error( $result ) ) {
         return new \WP_Error( 'subscribe_error', $result->get_error_message(), [ 'status' => 500 ] );
@@ -250,11 +263,11 @@ function is_rate_limited(): bool {
  * Uses /api/public/subscription which respects the list's opt-in setting
  * (double opt-in if configured). This is intentional.
  *
- * @param string $email     Subscriber email.
- * @param string $list_uuid Listmonk list UUID.
+ * @param string        $email Subscriber email.
+ * @param array<string> $uuids One or more Listmonk list UUIDs.
  * @return true|\WP_Error
  */
-function send_to_listmonk( string $email, string $list_uuid ): true|\WP_Error {
+function send_to_listmonk( string $email, array $uuids ): true|\WP_Error {
     $settings     = get_plugin_settings();
     $listmonk_url = $settings['listmonk_url'] ?? '';
 
@@ -272,7 +285,7 @@ function send_to_listmonk( string $email, string $list_uuid ): true|\WP_Error {
             ],
             'body'    => wp_json_encode( [
                 'email'      => $email,
-                'list_uuids' => [ $list_uuid ],
+                'list_uuids' => array_values( $uuids ),
             ] ),
             'timeout' => 8,
         ]
