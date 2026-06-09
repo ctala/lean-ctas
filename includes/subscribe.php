@@ -67,7 +67,7 @@ add_action( 'admin_post_nopriv_lc_subscribe', __NAMESPACE__ . '\\handle_post' );
 add_action( 'admin_post_lc_subscribe', __NAMESPACE__ . '\\handle_post' );
 
 // REST endpoint for progressive-enhancement JS path.
-add_action( 'rest_api_init', __NAMESPACE__ . '\\register_rest_route' );
+add_action( 'rest_api_init', __NAMESPACE__ . '\\register_routes' );
 
 /* ─────────────────────────────────────────────
    No-JS handler
@@ -130,9 +130,14 @@ function redirect_back( string $status, string $url ): void {
 
 /**
  * Register the REST route for the JS-enhanced path.
+ *
+ * NOTE: named register_routes() (not register_rest_route) to avoid colliding
+ * with WP's global register_rest_route(); inside a namespace an unqualified
+ * call would resolve to this function and recurse infinitely. The WP call
+ * below is fully qualified with a leading backslash for the same reason.
  */
-function register_rest_route(): void {
-    register_rest_route(
+function register_routes(): void {
+    \register_rest_route(
         'lean-ctas/v1',
         '/subscribe',
         [
