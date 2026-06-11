@@ -410,7 +410,7 @@ function print_styles(): void {
         if(!em||!em.value)return;
         btn.disabled=true;
         fetch(U,{method:'POST',headers:{'Content-Type':'application/json'},
-            body:JSON.stringify({email:em.value,list_uuid:f.dataset.list,hp:''})})
+            body:JSON.stringify({email:em.value,list_uuid:f.dataset.list,hp:'',page_url:location.href})})
         .then(function(r){return r.json()})
         .then(function(d){
             var s=f.closest('.lean-cta-optin-state');

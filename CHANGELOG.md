@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.0] - 2026-06-11
+
+### Added
+- **Capture webhook routing (n8n)**: optional global setting `capture_webhook_url`. When set, opt-in submissions POST there (JSON: `email`, `list_uuids`, `page_url`, `client_id`, `session_id`) and the n8n workflow handles Listmonk + GA4 Measurement Protocol + future plumbing (CRM/tagging). **Automatic fallback to direct Listmonk** on webhook failure (non-2xx / 4s timeout) — a capture is never lost. The webhook URL lives server-side only (browser never sees it).
+- **GA cookie passthrough** (`get_ga_ids()`): parses the visitor's `_ga` (client_id) and `_ga_*` (session_id) cookies server-side, so the server-side GA4 `generate_lead` event attributes to the visitor's real session/channel. Works on both the no-JS (admin-post) and REST paths (same-origin requests carry cookies).
+- REST arg + JS: `page_url` now sent with submissions (enables per-article/category tagging downstream).
+
 ## [2.4.1] - 2026-06-09
 
 ### Added

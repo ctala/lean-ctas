@@ -47,6 +47,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 use function LeanCTAs\Helpers\get_plugin_settings;
 use function LeanCTAs\Helpers\get_configured_optin_uuids;
 use function LeanCTAs\Helpers\parse_uuid_list;
+use function LeanCTAs\Helpers\get_ga_ids;
 use function LeanCTAs\Helpers\get_client_ip;
 
 /* ─────────────────────────────────────────────
@@ -112,7 +113,7 @@ function handle_post(): void {
         return;
     }
 
-    $result = send_to_listmonk( $email, $uuids );
+    $result = deliver_capture( $email, $uuids, $referer );
 
     redirect_back( is_wp_error( $result ) ? 'err' : 'ok', $referer );
 }
@@ -167,6 +168,12 @@ function register_routes(): void {
                     'default'           => '',
                     'sanitize_callback' => 'sanitize_text_field',
                 ],
+                'page_url' => [
+                    'required'          => false,
+                    'type'              => 'string',
+                    'default'           => '',
+                    'sanitize_callback' => 'esc_url_raw',
+                ],
             ],
         ]
     );
@@ -205,7 +212,8 @@ function rest_subscribe( \WP_REST_Request $request ): \WP_REST_Response|\WP_Erro
         return rest_ensure_response( [ 'success' => true ] );
     }
 
-    $result = send_to_listmonk( $email, $uuids );
+    $page_url = esc_url_raw( (string) $request->get_param( 'page_url' ) );
+    $result   = deliver_capture( $email, $uuids, $page_url );
 
     if ( is_wp_error( $result ) ) {
         return new \WP_Error( 'subscribe_error', $result->get_error_message(), [ 'status' => 500 ] );
@@ -251,6 +259,55 @@ function is_rate_limited(): bool {
     set_transient( $key, $count + 1, RATE_WINDOW );
 
     return false;
+}
+
+/* ─────────────────────────────────────────────
+   Delivery router: capture webhook (n8n) con fallback a Listmonk directo
+───────────────────────────────────────────── */
+
+/**
+ * Deliver the capture. If a capture webhook (n8n) is configured, POST there —
+ * the workflow handles Listmonk + GA4 Measurement Protocol + future plumbing
+ * (CRM/tagging). On webhook failure (non-2xx / timeout), falls back to the
+ * direct Listmonk path so a capture is never lost.
+ *
+ * @param string        $email    Subscriber email.
+ * @param array<string> $uuids    Listmonk list UUIDs.
+ * @param string        $page_url Page where the form was submitted (for GA4/tagging).
+ * @return true|\WP_Error
+ */
+function deliver_capture( string $email, array $uuids, string $page_url = '' ): true|\WP_Error {
+    $settings    = get_plugin_settings();
+    $webhook_url = $settings['capture_webhook_url'] ?? '';
+
+    if ( ! empty( $webhook_url ) ) {
+        $ga = get_ga_ids();
+
+        $response = wp_remote_post(
+            $webhook_url,
+            [
+                'headers' => [ 'Content-Type' => 'application/json; charset=utf-8' ],
+                'body'    => wp_json_encode( [
+                    'email'      => $email,
+                    'list_uuids' => array_values( $uuids ),
+                    'page_url'   => $page_url,
+                    'client_id'  => $ga['client_id'],
+                    'session_id' => $ga['session_id'],
+                ] ),
+                'timeout' => 4,
+            ]
+        );
+
+        if ( ! is_wp_error( $response ) ) {
+            $code = wp_remote_retrieve_response_code( $response );
+            if ( $code >= 200 && $code < 300 ) {
+                return true;
+            }
+        }
+        // Fall through: webhook caído/lento → entrega directa a Listmonk (sin GA4).
+    }
+
+    return send_to_listmonk( $email, $uuids );
 }
 
 /* ─────────────────────────────────────────────

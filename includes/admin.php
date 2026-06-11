@@ -185,6 +185,20 @@ function render_page(): void {
                     </td>
                 </tr>
                 <tr>
+                    <th scope="row"><?php esc_html_e( 'Capture webhook URL (n8n)', 'lean-ctas' ); ?></th>
+                    <td>
+                        <input type="url"
+                            name="<?php echo esc_attr( OPTION_KEY ); ?>[capture_webhook_url]"
+                            value="<?php echo esc_attr( $settings['capture_webhook_url'] ?? '' ); ?>"
+                            placeholder="https://n8n.example.com/webhook/…"
+                            autocomplete="off"
+                            style="width:360px">
+                        <p class="description">
+                            <?php esc_html_e( 'Optional. If set, opt-in submissions POST here (n8n handles Listmonk + GA4 + plumbing). Falls back to direct Listmonk if the webhook fails. Server-side only — never exposed to the browser.', 'lean-ctas' ); ?>
+                        </p>
+                    </td>
+                </tr>
+                <tr>
                     <th scope="row"><?php esc_html_e( 'Listmonk API user', 'lean-ctas' ); ?></th>
                     <td>
                         <input type="text"

@@ -33,6 +33,7 @@ function defaults(): array {
         'listmonk_url'           => '',
         'listmonk_api_user'      => '',
         'listmonk_api_token'     => '',
+        'capture_webhook_url'    => '',
         'ctas'                   => [],
     ];
 }
@@ -91,6 +92,7 @@ function sanitize( mixed $input ): array {
     $clean['listmonk_url']           = esc_url_raw( rtrim( $input['listmonk_url'] ?? '', '/' ) );
     $clean['listmonk_api_user']      = sanitize_text_field( $input['listmonk_api_user'] ?? '' );
     $clean['listmonk_api_token']     = sanitize_text_field( $input['listmonk_api_token'] ?? '' );
+    $clean['capture_webhook_url']    = esc_url_raw( $input['capture_webhook_url'] ?? '' );
 
     // Post types — accept only registered public types.
     $clean['post_types'] = [];
@@ -182,6 +184,42 @@ function get_configured_optin_uuids(): array {
 function parse_uuid_list( string $raw ): array {
     $parts = array_map( 'trim', explode( ',', $raw ) );
     return array_values( array_filter( $parts, static fn( $p ) => $p !== '' ) );
+}
+
+/**
+ * Extract GA4 client_id and session_id from the visitor's GA cookies.
+ *
+ * Same-origin form POSTs (admin-post and REST fetch) carry the cookies, so the
+ * server can read them and pass them to the capture webhook — the GA4
+ * Measurement Protocol event then attributes to the visitor's real session.
+ *
+ * _ga cookie:        "GA1.1.123456789.1700000000"      → client_id "123456789.1700000000"
+ * _ga_<stream>:      "GS1.1.1700000000.5.1...."        → session_id "1700000000"
+ *
+ * @return array{client_id: string, session_id: string}
+ */
+function get_ga_ids(): array {
+    $client_id  = '';
+    $session_id = '';
+
+    if ( ! empty( $_COOKIE['_ga'] ) ) {
+        $parts = explode( '.', sanitize_text_field( wp_unslash( $_COOKIE['_ga'] ) ) );
+        if ( count( $parts ) >= 4 ) {
+            $client_id = $parts[2] . '.' . $parts[3];
+        }
+    }
+
+    foreach ( $_COOKIE as $name => $value ) {
+        if ( 0 === strpos( (string) $name, '_ga_' ) ) {
+            $parts = explode( '.', sanitize_text_field( wp_unslash( (string) $value ) ) );
+            if ( count( $parts ) >= 3 ) {
+                $session_id = $parts[2];
+            }
+            break;
+        }
+    }
+
+    return [ 'client_id' => $client_id, 'session_id' => $session_id ];
 }
 
 /**
