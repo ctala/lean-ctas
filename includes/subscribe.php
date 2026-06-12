@@ -91,6 +91,13 @@ function handle_post(): void {
     $email = sanitize_email( wp_unslash( $_POST['lc_email'] ?? '' ) );
     // lc_list may carry one or several comma-separated list UUIDs.
     $uuids = parse_uuid_list( sanitize_text_field( wp_unslash( $_POST['lc_list'] ?? '' ) ) );
+    // Cross-sell checkbox (secondary list) — only present when checked.
+    if ( ! empty( $_POST['lc_secondary'] ) ) {
+        $uuids = array_values( array_unique( array_merge(
+            $uuids,
+            parse_uuid_list( sanitize_text_field( wp_unslash( $_POST['lc_secondary'] ) ) )
+        ) ) );
+    }
 
     if ( ! is_email( $email ) || empty( $uuids ) ) {
         redirect_back( 'err', $referer );

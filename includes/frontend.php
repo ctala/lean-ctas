@@ -271,6 +271,10 @@ function render_optin( array $cta ): string {
     $label       = esc_html( $cta['button_label'] ?: __( 'Subscribe', 'lean-ctas' ) );
     $list_uuid   = esc_attr( $cta['optin_list_uuid'] ?? '' );  // may be "uuid1,uuid2" — handler splits it.
     $success_msg = esc_html( $cta['optin_success_msg'] ?: __( 'Check your email to confirm your subscription.', 'lean-ctas' ) );
+    // Optional cross-sell checkbox (secondary list). ALWAYS unchecked by default:
+    // pre-ticked consent is invalid under GDPR (Planet49) and hurts deliverability.
+    $secondary_uuid  = esc_attr( $cta['optin_secondary_uuid'] ?? '' );
+    $secondary_label = $cta['optin_secondary_label'] ?? '';
     // Unique per render so popup + after-post-content instances don't collide on element IDs.
     $uid         = esc_attr( wp_unique_id( 'lc' ) );
 
@@ -326,6 +330,13 @@ function render_optin( array $cta ): string {
                . ' required autocomplete="email">';
         $html .= '<button type="submit" class="lean-cta-btn">' . $label . '</button>';
         $html .= '</div>';
+
+        if ( $secondary_uuid && $secondary_label ) {
+            $html .= '<label class="lean-cta-optin-secondary" for="lc_sec_' . $uid . '">'
+                   . '<input type="checkbox" id="lc_sec_' . $uid . '" name="lc_secondary" value="' . $secondary_uuid . '">'
+                   . '<span>' . esc_html( $secondary_label ) . '</span>'
+                   . '</label>';
+        }
 
         if ( 'err' === $done ) {
             $html .= '<p class="lean-cta-optin-error" role="alert">'
@@ -386,6 +397,8 @@ function print_styles(): void {
     .lean-cta-optin-row{display:flex;gap:8px;align-items:stretch;flex-wrap:wrap}
     .lean-cta-optin-row input[type=email]{flex:1 1 200px;min-width:0;padding:8px 12px;border:1px solid #ccc;border-radius:4px;font-size:.9em;font-family:inherit;background:transparent;color:inherit;box-sizing:border-box}
     .lean-cta-optin-row input[type=email]:focus{outline:2px solid var(--lean-accent);outline-offset:1px;border-color:transparent}
+    .lean-cta-optin-secondary{display:flex;gap:8px;align-items:flex-start;margin:10px 0 0;font-size:.85em;color:var(--lean-text);cursor:pointer;line-height:1.4}
+    .lean-cta-optin-secondary input[type=checkbox]{margin-top:2px;accent-color:var(--lean-accent);cursor:pointer}
     .lean-cta-optin-success{margin:0;font-weight:600;color:var(--lean-title);font-size:.95em}
     .lean-cta-optin-error{margin:6px 0 0;font-size:.85em;color:#c00}
     .screen-reader-text{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
@@ -408,9 +421,11 @@ function print_styles(): void {
         e.preventDefault();
         var em=f.querySelector('[name=lc_email]'),btn=f.querySelector('[type=submit]');
         if(!em||!em.value)return;
+        var L=f.dataset.list,sec=f.querySelector('[name=lc_secondary]');
+        if(sec&&sec.checked)L+=','+sec.value;
         btn.disabled=true;
         fetch(U,{method:'POST',headers:{'Content-Type':'application/json'},
-            body:JSON.stringify({email:em.value,list_uuid:f.dataset.list,hp:'',page_url:location.href})})
+            body:JSON.stringify({email:em.value,list_uuid:L,hp:'',page_url:location.href})})
         .then(function(r){return r.json()})
         .then(function(d){
             var s=f.closest('.lean-cta-optin-state');

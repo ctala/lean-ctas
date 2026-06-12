@@ -70,6 +70,8 @@ function cta_defaults(): array {
         // Opt-in form fields (only used when button_type = 'optin_form').
         'optin_list_uuid'      => '',
         'optin_success_msg'    => '',
+        'optin_secondary_uuid'  => '',
+        'optin_secondary_label' => '',
     ];
 }
 
@@ -141,6 +143,8 @@ function sanitize( mixed $input ): array {
                 // Opt-in form fields.
                 'optin_list_uuid'   => sanitize_text_field( $cta['optin_list_uuid'] ?? '' ),
                 'optin_success_msg' => sanitize_text_field( $cta['optin_success_msg'] ?? '' ),
+                'optin_secondary_uuid'  => sanitize_text_field( $cta['optin_secondary_uuid'] ?? '' ),
+                'optin_secondary_label' => sanitize_text_field( $cta['optin_secondary_label'] ?? '' ),
             ];
         }
     }
@@ -169,6 +173,10 @@ function get_configured_optin_uuids(): array {
             // optin_list_uuid may be a single UUID or several comma-separated
             // (matches the old Forminator addon behaviour of one form → many lists).
             $uuids = array_merge( $uuids, parse_uuid_list( $cta['optin_list_uuid'] ) );
+            // Secondary (cross-sell checkbox) list is also legitimate.
+            if ( ! empty( $cta['optin_secondary_uuid'] ) ) {
+                $uuids = array_merge( $uuids, parse_uuid_list( $cta['optin_secondary_uuid'] ) );
+            }
         }
     }
 

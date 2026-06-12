@@ -407,6 +407,18 @@ function render_cta_row( int|string $i, array $cta, array $tax_options, array $p
                     value="<?php echo esc_attr( $cta['optin_success_msg'] ?? '' ); ?>"
                     placeholder="<?php esc_attr_e( 'Check your email to confirm your subscription.', 'lean-ctas' ); ?>">
             </div>
+            <div class="lean-field-optin" <?php echo $cta['button_type'] !== 'optin_form' ? 'style="display:none"' : ''; ?>>
+                <label><?php esc_html_e( 'Secondary list UUID (cross-sell checkbox)', 'lean-ctas' ); ?></label>
+                <input type="text" name="<?php echo esc_attr( $n ); ?>[optin_secondary_uuid]"
+                    value="<?php echo esc_attr( $cta['optin_secondary_uuid'] ?? '' ); ?>"
+                    placeholder="uuid (optional)">
+            </div>
+            <div class="lean-field-optin" <?php echo $cta['button_type'] !== 'optin_form' ? 'style="display:none"' : ''; ?>>
+                <label><?php esc_html_e( 'Secondary checkbox label', 'lean-ctas' ); ?></label>
+                <input type="text" name="<?php echo esc_attr( $n ); ?>[optin_secondary_label]"
+                    value="<?php echo esc_attr( $cta['optin_secondary_label'] ?? '' ); ?>"
+                    placeholder="<?php esc_attr_e( 'Also send me…', 'lean-ctas' ); ?>">
+            </div>
         </div>
     </div>
     <?php
