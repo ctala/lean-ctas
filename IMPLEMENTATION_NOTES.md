@@ -1,4 +1,16 @@
-# Implementation Notes — opt-in form mode (v2.4.0 → v2.5.0)
+# Implementation Notes — opt-in form mode (v2.4.0 → v2.6.0)
+
+## v2.6.0 — Cross-sell checkbox (secondary list)
+
+Per-CTA fields `optin_secondary_uuid` + `optin_secondary_label`. When both are
+set, `render_optin()` renders an **unchecked** checkbox (`name="lc_secondary"`,
+value = uuid). Unchecked-by-default is deliberate: GDPR (Planet49) invalidates
+pre-ticked consent, and silently subscribing weekly-newsletter signups to a
+DAILY list triggers spam complaints against the shared sending domain.
+Merge points: no-JS handler merges `$_POST['lc_secondary']` into the uuid list;
+the inline JS appends `sec.value` to `list_uuid` before fetch. The secondary
+uuid is added to `get_configured_optin_uuids()` (allowlist). Reference deploy:
+eco offers Navegando, cristiantala.com offers Daily Shot (bidirectional).
 
 ## v2.5.0 — Capture webhook routing (n8n) + GA cookie passthrough
 

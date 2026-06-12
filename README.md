@@ -129,6 +129,10 @@ A CTA can render an email capture form connected to [Listmonk](https://listmonk.
 
 Optionally set **Capture webhook URL (n8n)** in global settings. When set, submissions POST there as JSON (`email`, `list_uuids`, `page_url`, GA `client_id`/`session_id` parsed server-side from the visitor's cookies) so an n8n workflow can handle Listmonk + a server-side GA4 `generate_lead` event (Measurement Protocol, with real session attribution) + any extra plumbing (tagging, CRM). **Automatic fallback:** if the webhook fails (non-2xx / 4s timeout) the plugin falls back to the direct Listmonk path — a capture is never lost. The webhook URL is server-side only; the browser never sees it.
 
+### Cross-sell checkbox — secondary list (v2.6.0+)
+
+An opt-in CTA can offer a **second list** via checkbox: set **Secondary list UUID** + **Secondary checkbox label** in the CTA row. The checkbox is **always unchecked by default** — pre-ticked consent is invalid under GDPR (Planet49) and silently adding users to higher-frequency lists hurts deliverability. Works on both paths (no-JS and JS); the secondary UUID joins the allowlist. Take-rate is measurable via the `list_uuids` param in the capture webhook / GA4 event.
+
 ### Placement anywhere (v2.4.1+)
 
 A CTA with **Position: Manual** is never auto-injected; render it wherever you want with `[lean_cta optin="1"]` (e.g. inside a sitewide popup in `wp_footer`). On successful JS subscription the plugin dispatches a `leanctas:subscribed` DOM event so your popup can auto-close.
