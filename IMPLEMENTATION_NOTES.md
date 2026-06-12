@@ -1,4 +1,37 @@
-# Implementation Notes — v2.4.0 opt-in form mode
+# Implementation Notes — opt-in form mode (v2.4.0 → v2.5.0)
+
+## v2.5.0 — Capture webhook routing (n8n) + GA cookie passthrough
+
+**Delivery router (`deliver_capture()` in subscribe.php):** if the global setting
+`capture_webhook_url` is set, submissions POST there as JSON:
+
+```json
+{"email":"…","list_uuids":["…"],"page_url":"…","client_id":"…","session_id":"…"}
+```
+
+The n8n workflow handles Listmonk + GA4 Measurement Protocol (`generate_lead`)
++ any future plumbing (tagging, CRM). **Fallback:** on webhook failure
+(WP_Error / non-2xx / 4s timeout) WP falls back to the direct Listmonk path —
+a capture is never lost. The webhook URL lives server-side only (the browser
+never sees it; path-as-secret).
+
+**GA cookie passthrough (`get_ga_ids()` in helpers.php):** same-origin POSTs
+carry the visitor's `_ga` (→ client_id) and `_ga_*` (→ session_id) cookies;
+WP parses them server-side so the server-side GA4 event attributes to the
+visitor's REAL session/channel. Without client_id an MP event doesn't attribute.
+
+**Reference deployment (eco):** the full funnel architecture, IDs, test
+commands and gotchas live in the (private) strategy repo:
+`operacion/eco-email-capture/ARQUITECTURA-FUNNEL.md`.
+
+## v2.4.1 — Multi-list + unique IDs
+
+`optin_list_uuid` accepts comma-separated UUIDs (`uuid1,uuid2` → both lists).
+Form element IDs use `wp_unique_id()` (popup + in-post instances coexist).
+
+---
+
+# v2.4.0 opt-in form mode
 
 ## What changed
 
