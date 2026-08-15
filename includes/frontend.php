@@ -16,6 +16,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 use function LeanCTAs\Helpers\get_plugin_settings;
+use function LeanCTAs\Captcha\is_configured as captcha_is_configured;
+use function LeanCTAs\Captcha\widget_html as captcha_widget_html;
+use function LeanCTAs\Captcha\script_tag as captcha_script_tag;
 
 // Priority 1001: must run AFTER leanautolinks (priority 999) which replaces
 // content with its pre-cached version. Running before it would lose the CTA.
@@ -320,6 +323,12 @@ function render_optin( array $cta ): string {
                . '<input type="text" id="lc_hp_' . $uid . '" name="lc_hp" value="" autocomplete="off" tabindex="-1">'
                . '</span>';
 
+        // Turnstile widget: no-op markup (empty string) when not configured in
+        // Settings → Lean CTAs — existing installs render exactly as before.
+        // Cloudflare's api.js (loaded in print_styles()) finds this div and
+        // injects its own hidden "cf-turnstile-response" input into the form.
+        $html .= captcha_widget_html();
+
         $html .= '<div class="lean-cta-optin-row">';
         $html .= '<label for="lc_email_' . $uid . '" class="screen-reader-text">'
                . esc_html__( 'Email address', 'lean-ctas' )
@@ -406,7 +415,14 @@ function print_styles(): void {
     </style>
     <script>document.addEventListener('DOMContentLoaded',function(){var b=getComputedStyle(document.body).backgroundColor,m=b.match(/\d+/g);if(m&&m.length>=3){var l=(.299*m[0]+.587*m[1]+.114*m[2]);if(l<128)document.querySelectorAll('.lean-cta-block').forEach(function(e){e.classList.add('lean-cta-dark')})}})</script>
     <?php
+    // Turnstile: only loaded when configured (see Captcha\is_configured()) — no
+    // request to challenges.cloudflare.com happens on installs without keys.
+    if ( $has_optin && captcha_is_configured() ) {
+        echo captcha_script_tag(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- own trusted markup, no user input.
+    }
+    ?>
 
+    <?php
     // Progressive-enhancement JS for optin forms — only injected when needed.
     // Intercepts submit, posts to REST, swaps form for success message without reload.
     // Falls back to normal POST if JS is disabled or fetch fails.
@@ -423,9 +439,12 @@ function print_styles(): void {
         if(!em||!em.value)return;
         var L=f.dataset.list,sec=f.querySelector('[name=lc_secondary]');
         if(sec&&sec.checked)L+=','+sec.value;
+        // Turnstile (when configured) injects this hidden field itself; '' when absent.
+        var cf=f.querySelector('[name="cf-turnstile-response"]');
         btn.disabled=true;
         fetch(U,{method:'POST',headers:{'Content-Type':'application/json'},
-            body:JSON.stringify({email:em.value,list_uuid:L,hp:'',page_url:location.href})})
+            body:JSON.stringify({email:em.value,list_uuid:L,hp:'',page_url:location.href,
+                cf_turnstile_response:cf?cf.value:''})})
         .then(function(r){return r.json()})
         .then(function(d){
             var s=f.closest('.lean-cta-optin-state');

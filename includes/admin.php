@@ -221,6 +221,32 @@ function render_page(): void {
                         </p>
                     </td>
                 </tr>
+                <tr>
+                    <th scope="row"><?php esc_html_e( 'Turnstile Site Key', 'lean-ctas' ); ?></th>
+                    <td>
+                        <input type="text"
+                            name="<?php echo esc_attr( OPTION_KEY ); ?>[captcha_site_key]"
+                            value="<?php echo esc_attr( $settings['captcha_site_key'] ?? '' ); ?>"
+                            autocomplete="off"
+                            style="width:360px">
+                        <p class="description">
+                            <?php esc_html_e( 'Cloudflare Turnstile site key (public). Leave both keys blank to keep opt-in forms exactly as they are today — no captcha shown.', 'lean-ctas' ); ?>
+                        </p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row"><?php esc_html_e( 'Turnstile Secret Key', 'lean-ctas' ); ?></th>
+                    <td>
+                        <input type="password"
+                            name="<?php echo esc_attr( OPTION_KEY ); ?>[captcha_secret_key]"
+                            value="<?php echo esc_attr( $settings['captcha_secret_key'] ?? '' ); ?>"
+                            autocomplete="new-password"
+                            style="width:360px">
+                        <p class="description">
+                            <?php esc_html_e( 'Cloudflare Turnstile secret key. Both keys are required to turn the challenge on — set only one and it stays off. Get a free pair at dash.cloudflare.com → Turnstile → Add site.', 'lean-ctas' ); ?>
+                        </p>
+                    </td>
+                </tr>
             </table>
 
             <h2 style="margin-top:2em"><?php esc_html_e( 'Configured CTAs', 'lean-ctas' ); ?></h2>

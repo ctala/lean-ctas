@@ -145,6 +145,18 @@ The plugin sends to Listmonk's public endpoint (`/api/public/subscription`). If 
 
 The form works with `<form method="post">` and a full page reload if JavaScript is disabled or unavailable. With JS, a ~1.3 KB vanilla fetch script intercepts the submit and swaps the form for the success message without reload.
 
+**Caveat if Cloudflare Turnstile (below) is configured:** Turnstile itself needs JavaScript to solve the challenge, so a visitor with JS fully disabled cannot subscribe while it's active — that's inherent to any browser captcha, not specific to Turnstile. Leave the Turnstile keys blank to keep the form fully no-JS friendly.
+
+### Anti-spam: Cloudflare Turnstile challenge (v2.7.0+)
+
+Honeypot + UUID allowlist + IP rate limit stop a *lazy* bot but not a **distributed** one — many source IPs, few requests each, honeypot field never touched. That's what hit `ecosistemastartup.com` on 12–14 ago 2026 (~331 third-party addresses injected, each also firing a GA4 `generate_lead` event through the capture webhook).
+
+1. Cloudflare dashboard → **Turnstile** → Add site → get a **Site Key** and **Secret Key** (free, no request cap).
+2. Settings → Lean CTAs → paste both into **Turnstile Site Key** / **Turnstile Secret Key**.
+3. That's it — no code change. Both keys are required to activate; leave either blank and the plugin behaves exactly as it did in 2.6.0 (no captcha shown, no `challenges.cloudflare.com` request).
+
+Enforced identically on **both** submission paths (REST `/lean-ctas/v1/subscribe` and the no-JS `admin_post` fallback) — a bot switching from one path to the other doesn't help it. Fails **closed**: once configured, a missing or invalid token is rejected, not silently accepted. See `includes/captcha.php` for why Turnstile was chosen over reCAPTCHA.
+
 ### Smoke test (staging)
 
 1. Install and activate plugin on a staging WP instance.
@@ -155,6 +167,10 @@ The form works with `<form method="post">` and a full page reload if JavaScript 
 6. Re-enable JS → submit form → success message swaps in without reload.
 7. Check Listmonk → Subscribers → the email appears (status "unconfirmed" if double opt-in is on, pending confirmation email).
 8. Confirm the confirmation email → subscriber becomes active.
+9. **Turnstile — legit path:** set both Turnstile keys (use Cloudflare's [always-passes test keys](https://developers.cloudflare.com/turnstile/troubleshooting/testing/) on staging: site key `1x00000000000000000000AA`, secret key `1x0000000000000000000000000000000AA`). Submit the form → succeeds exactly as before (widget is invisible with these test keys).
+10. **Turnstile — rejection, REST path:** `curl -s -X POST '<site>/wp-json/lean-ctas/v1/subscribe' -H 'Content-Type: application/json' -d '{"email":"test@example.com","list_uuid":"<configured uuid>"}'` (no `cf_turnstile_response`) → expect HTTP 400, `{"code":"captcha_failed",...}`. Confirm nothing was created in Listmonk.
+11. **Turnstile — rejection, no-JS path:** `curl -s -i -X POST '<site>/wp-admin/admin-post.php' -d 'action=lc_subscribe&lc_email=test@example.com&lc_list=<configured uuid>'` (no captcha field) → expect a 302 redirect to `?lc_done=err`. Confirm nothing was created in Listmonk.
+12. Set only one of the two keys → confirm the form renders and submits with no captcha shown (fail-open on "not configured").
 
 For Daily Shot (`ecosistemastartup.com`):
 - Listmonk URL: `https://listmonk.nyx.cristiantala.com`

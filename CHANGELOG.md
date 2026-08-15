@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.7.0] - 2026-08-14
+
+### Added
+- **Cloudflare Turnstile challenge for opt-in submissions** (`includes/captcha.php`, new file): closes a gap the honeypot + IP rate limit didn't cover — a **distributed** bot (many source IPs, few requests each, honeypot field never touched) sails under both. Between 12-ago and 14-ago a bot injected ~331 third-party addresses (mostly aol.com/cox.net/comcast.net/netzero.net/bellsouth.net) into a public list this way, and each fake signup also fired a `generate_lead` GA4 event via the capture webhook (+3.359% in the dashboard). Turnstile chosen over reCAPTCHA: the site already runs behind Cloudflare, it's free with no request cap, sends no visitor data to Google, and is invisible by default. Full rationale in `includes/captcha.php`.
+  - **Opt-in only, both entry paths**: enforced in `rest_subscribe()` (REST — the route the bot actually used) and `handle_post()` (no-JS `admin_post`) identically. Neither path is a weaker back door into the other.
+  - **Fail-closed / fail-open contract**: if both Turnstile keys (site + secret) are set in Settings → Lean CTAs, a missing or invalid token rejects the submission. If either key is blank, the plugin behaves exactly as before — zero risk of bricking an install that hasn't configured Turnstile.
+  - **Additive, not a replacement**: honeypot + UUID allowlist + IP rate limit are unchanged and still run.
+  - **No-JS path caveat**: Turnstile itself requires JavaScript to solve the challenge — there is no vendor-agnostic non-JS captcha. When Turnstile is configured, a visitor with JS fully disabled cannot pass it on either path (this was already true of every captcha vendor, including reCAPTCHA). Accepted trade-off: no-JS traffic on this form is negligible, and leaving both keys blank keeps the original no-JS-friendly behavior (honeypot + rate limit only).
+- **`get_client_ip()` hardened against IP spoofing**: previously any request carrying a `CF-Connecting-IP` header was trusted unconditionally — on a site that sits behind Cloudflare that header should always be legitimate, but a request that reaches the origin *directly* (bypassing Cloudflare, e.g. if the origin IP is known) could set an arbitrary `CF-Connecting-IP` and evade the per-IP rate limit entirely. Now only trusted when `REMOTE_ADDR` (the real TCP peer, not spoofable) is itself inside Cloudflare's published edge IP ranges (new `is_cloudflare_ip()` / `ip_in_cidr()` helpers, hardcoded from cloudflare.com/ips — verify periodically). Falls back to `REMOTE_ADDR` otherwise. This is also what makes the Turnstile `remoteip` check and the pre-existing rate limit meaningful again on this stack.
+- Settings → Lean CTAs: **Turnstile Site Key** / **Turnstile Secret Key** fields. Both required to activate; setting only one leaves the challenge off.
+
 ## [2.6.0] - 2026-06-12
 
 ### Added

@@ -17,13 +17,21 @@ declare( strict_types=1 );
  *   Listmonk's public endpoint anyway; the worst outcome is a confirmation
  *   email the recipient never clicks), while the breakage is total and silent.
  *
- *   Protection comes from three layers instead:
+ *   Protection comes from four layers instead:
  *     1. Honeypot field (off-screen, bots fill it, humans don't).
  *     2. UUID allowlist: submitted list_uuid must be one configured in
  *        Settings → Lean CTAs. Prevents using this handler to subscribe
  *        addresses to arbitrary Listmonk lists.
  *     3. IP rate limit: max 10 submits per IP per 10 min (transient).
  *        Limits email-bombing of third-party inboxes even if honeypot is bypassed.
+ *     4. Cloudflare Turnstile challenge (optional, since 2.7.0): closes the
+ *        gap the other three don't cover — a DISTRIBUTED bot (many IPs,
+ *        few requests each, honeypot field never touched) sails under both
+ *        the honeypot and the rate limit. See includes/captcha.php for the
+ *        provider rationale. Only enforced when Settings → Lean CTAs has
+ *        both Turnstile keys configured; existing installs without keys are
+ *        unaffected (fail-open on "not configured", fail-closed on "configured
+ *        but invalid/missing token").
  *
  * Listmonk delivery uses the PUBLIC endpoint (no auth required):
  *   POST {listmonk_url}/api/public/subscription
@@ -49,6 +57,9 @@ use function LeanCTAs\Helpers\get_configured_optin_uuids;
 use function LeanCTAs\Helpers\parse_uuid_list;
 use function LeanCTAs\Helpers\get_ga_ids;
 use function LeanCTAs\Helpers\get_client_ip;
+use function LeanCTAs\Captcha\is_configured as captcha_is_configured;
+use function LeanCTAs\Captcha\verify as captcha_verify;
+use const LeanCTAs\Captcha\FIELD_NAME as CAPTCHA_FIELD_NAME;
 
 /* ─────────────────────────────────────────────
    Constants
@@ -86,6 +97,16 @@ function handle_post(): void {
     if ( ! empty( $_POST['lc_hp'] ) ) {
         redirect_back( 'ok', $referer );
         return;
+    }
+
+    // Captcha: only enforced if configured (fail-closed on invalid/missing token,
+    // no-op when Turnstile keys aren't set — see includes/captcha.php).
+    if ( captcha_is_configured() ) {
+        $token = sanitize_text_field( wp_unslash( $_POST[ CAPTCHA_FIELD_NAME ] ?? '' ) );
+        if ( ! captcha_verify( $token, get_client_ip() ) ) {
+            redirect_back( 'err', $referer );
+            return;
+        }
     }
 
     $email = sanitize_email( wp_unslash( $_POST['lc_email'] ?? '' ) );
@@ -181,6 +202,12 @@ function register_routes(): void {
                     'default'           => '',
                     'sanitize_callback' => 'esc_url_raw',
                 ],
+                'cf_turnstile_response' => [
+                    'required'          => false,
+                    'type'              => 'string',
+                    'default'           => '',
+                    'sanitize_callback' => 'sanitize_text_field',
+                ],
             ],
         ]
     );
@@ -196,6 +223,15 @@ function rest_subscribe( \WP_REST_Request $request ): \WP_REST_Response|\WP_Erro
     // Honeypot.
     if ( ! empty( $request->get_param( 'hp' ) ) ) {
         return rest_ensure_response( [ 'success' => true ] );
+    }
+
+    // Captcha: same fail-closed contract as the no-JS path (handle_post()).
+    // This is the route the distributed bot actually uses — do not skip it.
+    if ( captcha_is_configured() ) {
+        $token = (string) $request->get_param( 'cf_turnstile_response' );
+        if ( ! captcha_verify( $token, get_client_ip() ) ) {
+            return new \WP_Error( 'captcha_failed', __( 'Verification failed. Please try again.', 'lean-ctas' ), [ 'status' => 400 ] );
+        }
     }
 
     $email = $request->get_param( 'email' );

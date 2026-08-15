@@ -34,6 +34,8 @@ function defaults(): array {
         'listmonk_api_user'      => '',
         'listmonk_api_token'     => '',
         'capture_webhook_url'    => '',
+        'captcha_site_key'       => '',
+        'captcha_secret_key'     => '',
         'ctas'                   => [],
     ];
 }
@@ -95,6 +97,9 @@ function sanitize( mixed $input ): array {
     $clean['listmonk_api_user']      = sanitize_text_field( $input['listmonk_api_user'] ?? '' );
     $clean['listmonk_api_token']     = sanitize_text_field( $input['listmonk_api_token'] ?? '' );
     $clean['capture_webhook_url']    = esc_url_raw( $input['capture_webhook_url'] ?? '' );
+    // Turnstile keys are opaque tokens, not URLs/HTML — plain text sanitize is enough.
+    $clean['captcha_site_key']       = sanitize_text_field( $input['captcha_site_key'] ?? '' );
+    $clean['captcha_secret_key']     = sanitize_text_field( $input['captcha_secret_key'] ?? '' );
 
     // Post types — accept only registered public types.
     $clean['post_types'] = [];
@@ -231,20 +236,89 @@ function get_ga_ids(): array {
 }
 
 /**
- * Get the real client IP, respecting Cloudflare's CF-Connecting-IP header.
+ * Cloudflare's published edge IP ranges (cloudflare.com/ips — v4 + v6).
+ * Verify periodically; this list has been stable for years but is not
+ * guaranteed permanent. Used to decide whether CF-Connecting-IP can be
+ * trusted (see get_client_ip()).
+ */
+const CLOUDFLARE_IPV4_RANGES = [
+    '173.245.48.0/20', '103.21.244.0/22', '103.22.200.0/22', '103.31.4.0/22',
+    '141.101.64.0/18', '108.162.192.0/18', '190.93.240.0/20', '188.114.96.0/20',
+    '197.234.240.0/22', '198.41.128.0/17', '162.158.0.0/15', '104.16.0.0/13',
+    '104.24.0.0/14', '172.64.0.0/13', '131.0.72.0/22',
+];
+const CLOUDFLARE_IPV6_RANGES = [
+    '2400:cb00::/32', '2606:4700::/32', '2803:f800::/32', '2405:b500::/32',
+    '2405:8100::/32', '2a06:98c0::/29', '2c0f:f248::/32',
+];
+
+/**
+ * Whether $ip falls inside $cidr (works for both IPv4 and IPv6).
+ */
+function ip_in_cidr( string $ip, string $cidr ): bool {
+    [ $subnet, $bits ] = array_pad( explode( '/', $cidr ), 2, '0' );
+    $bits = (int) $bits;
+
+    $ip_bin     = @inet_pton( $ip );
+    $subnet_bin = @inet_pton( $subnet );
+
+    if ( false === $ip_bin || false === $subnet_bin || strlen( $ip_bin ) !== strlen( $subnet_bin ) ) {
+        return false;
+    }
+
+    $full_bytes = intdiv( $bits, 8 );
+    $rem_bits   = $bits % 8;
+
+    if ( $full_bytes > 0 && substr( $ip_bin, 0, $full_bytes ) !== substr( $subnet_bin, 0, $full_bytes ) ) {
+        return false;
+    }
+
+    if ( $rem_bits > 0 ) {
+        $mask = chr( ( 0xFF << ( 8 - $rem_bits ) ) & 0xFF );
+        if ( ( substr( $ip_bin, $full_bytes, 1 ) & $mask ) !== ( substr( $subnet_bin, $full_bytes, 1 ) & $mask ) ) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+/**
+ * Whether $ip is a Cloudflare edge IP.
+ */
+function is_cloudflare_ip( string $ip ): bool {
+    foreach ( array_merge( CLOUDFLARE_IPV4_RANGES, CLOUDFLARE_IPV6_RANGES ) as $cidr ) {
+        if ( ip_in_cidr( $ip, $cidr ) ) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Get the real client IP.
  *
- * Only trusts CF-Connecting-IP when REMOTE_ADDR looks like a CF edge IP
- * (i.e. not localhost). In staging/non-CF environments falls back to REMOTE_ADDR.
+ * The site runs behind Cloudflare, so REMOTE_ADDR at the origin is always a
+ * CF edge IP and CF-Connecting-IP carries the real visitor IP — UNLESS a
+ * request reaches the origin directly (bypassing Cloudflare, e.g. if the
+ * origin IP leaks), in which case CF-Connecting-IP is just an attacker-
+ * supplied header and trusting it would let one spoofed IP evade the
+ * per-IP rate limit entirely.
+ *
+ * Fix: only trust CF-Connecting-IP when REMOTE_ADDR (the TCP peer — cannot
+ * be spoofed) is itself a known Cloudflare edge IP. Otherwise fall back to
+ * REMOTE_ADDR, which is always the real connecting peer.
  *
  * @return string Sanitized IP string (empty string if not determinable).
  */
 function get_client_ip(): string {
-    // Prefer CF-Connecting-IP when the connection comes through Cloudflare.
-    if ( ! empty( $_SERVER['HTTP_CF_CONNECTING_IP'] ) ) {
+    $remote_addr = sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ?? '' ) );
+
+    if ( ! empty( $_SERVER['HTTP_CF_CONNECTING_IP'] ) && is_cloudflare_ip( $remote_addr ) ) {
         return sanitize_text_field( wp_unslash( $_SERVER['HTTP_CF_CONNECTING_IP'] ) );
     }
 
-    return sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ?? '' ) );
+    return $remote_addr;
 }
 
 /**
