@@ -83,11 +83,13 @@ function widget_html(): string {
     // 30s sin token y HTTP 400 en un envío real. Preferimos un widget visible
     // antes que perder suscriptores.
     //
-    // min-height reserves the "normal" widget height (65px) up front: the widget
-    // is rendered after the first interaction, and without the reservation it
-    // would push the form down while the visitor is using it (CLS).
+    // No height reservation: eco's widget runs in Cloudflare's invisible mode and
+    // renders 0 px tall, so the min-height added in 2.7.1 left an empty 65 px band
+    // in every form. A visible widget does grow the form when it renders, but that
+    // happens while the visitor is typing, and shifts within 500 ms of input don't
+    // count toward CLS.
     return '<div class="cf-turnstile" data-sitekey="' . esc_attr( $settings['captcha_site_key'] )
-        . '" data-theme="auto" style="min-height:65px"></div>';
+        . '" data-theme="auto"></div>';
 }
 
 /**

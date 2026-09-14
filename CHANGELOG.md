@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.7.2] - 2026-09-14
+
+### Fixed
+- **Empty 65 px band in every opt-in form (regression from 2.7.1)**: the `min-height:65px` reservation assumed a visible widget, but eco's Turnstile widget runs in Cloudflare's **invisible** mode and renders 0 px tall, so production showed a blank band above the email field (in-content CTA and popup). Staging didn't show it because Cloudflare's always-passes test sitekey `1x00000000000000000000AA` is a *visible* widget. Reservation removed; test invisible-mode sites with `1x00000000000000000000BB` (always passes, invisible).
+
 ## [2.7.1] - 2026-09-14
 
 ### Fixed
