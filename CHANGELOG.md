@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.7.1] - 2026-09-14
+
+### Fixed
+- **Turnstile no longer runs on every page view (INP regression from 2.7.0)**: 2.7.0 printed Cloudflare's `api.js` in `<head>` and rendered one widget per opt-in form on page load (2 on eco's articles and home: the in-content CTA and the sitewide popup), so the managed challenge ran for every visitor — including the vast majority who never touch a form. On Android, Chrome keeps cross-origin iframes in the page's renderer process, so the challenge work runs on the page's main thread and taps anywhere on the page wait behind it. Search Console flagged ecosistemastartup.com for "INP issue: longer than 200 ms (mobile)" in Sep 2026.
+  - Lab evidence (production article, Pixel 5 emulation, CPU 8x, cross-origin iframes in-process, taps every ~1 s for 25 s, 2 runs per variant): with Turnstile 5–6 taps ≥200 ms per run (worst 848 / 1,344 ms); blocking only `challenges.cloudflare.com` → 0 taps ≥200 ms (worst 80 / 168 ms); blocking only the Meta Pixel → still 6 per run. **Caveat:** under automation Turnstile never issued a token and kept retrying (43 requests in 40 s), so the lab overstates the per-visit cost; what a real visitor pays is the challenge running during the first seconds of the page.
+  - `api.js` is now injected with `?render=explicit` on the first `pointerdown`/`focusin` inside an opt-in form, and the widget is rendered into that form only (`turnstile.render`).
+  - Submit waits for that form's token (max 20 s, then the usual error message), so autofill + instant submit still sends a valid token.
+  - The widget container reserves its height (`min-height:65px`) so rendering it later doesn't shift the form (CLS).
+  - Backend unchanged: `verify()` still fails closed on both submission paths.
+- `Captcha\script_tag()` replaced by `Captcha\script_src()` (URL only — the frontend JS decides when to load it).
+
 ## [2.7.0] - 2026-08-14
 
 ### Added

@@ -155,6 +155,8 @@ Honeypot + UUID allowlist + IP rate limit stop a *lazy* bot but not a **distribu
 2. Settings → Lean CTAs → paste both into **Turnstile Site Key** / **Turnstile Secret Key**.
 3. That's it — no code change. Both keys are required to activate; leave either blank and the plugin behaves exactly as it did in 2.6.0 (no captcha shown, no `challenges.cloudflare.com` request).
 
+**Loaded on intent, not with the page (v2.7.1+).** Turnstile's `api.js` is injected only on the first tap/focus inside an opt-in form, and the widget renders into that form; its container reserves 65 px so nothing shifts. Loading it with the page (2.7.0) ran the challenge on every visit, and on Android — where Chrome keeps cross-origin iframes on the page's main thread — that delayed taps anywhere on the page (Search Console INP issue on eco, Sep 2026). Submit waits up to 20 s for the token before showing the error message.
+
 Enforced identically on **both** submission paths (REST `/lean-ctas/v1/subscribe` and the no-JS `admin_post` fallback) — a bot switching from one path to the other doesn't help it. Fails **closed**: once configured, a missing or invalid token is rejected, not silently accepted. See `includes/captcha.php` for why Turnstile was chosen over reCAPTCHA.
 
 ### Smoke test (staging)
@@ -167,7 +169,7 @@ Enforced identically on **both** submission paths (REST `/lean-ctas/v1/subscribe
 6. Re-enable JS → submit form → success message swaps in without reload.
 7. Check Listmonk → Subscribers → the email appears (status "unconfirmed" if double opt-in is on, pending confirmation email).
 8. Confirm the confirmation email → subscriber becomes active.
-9. **Turnstile — legit path:** set both Turnstile keys (use Cloudflare's [always-passes test keys](https://developers.cloudflare.com/turnstile/troubleshooting/testing/) on staging: site key `1x00000000000000000000AA`, secret key `1x0000000000000000000000000000000AA`). Submit the form → succeeds exactly as before (widget is invisible with these test keys).
+9. **Turnstile — legit path:** set both Turnstile keys (use Cloudflare's [always-passes test keys](https://developers.cloudflare.com/turnstile/troubleshooting/testing/) on staging: site key `1x00000000000000000000AA`, secret key `1x0000000000000000000000000000000AA`). Load a post with DevTools → Network open: **no request to `challenges.cloudflare.com` until you tap/focus the email field**, then `api.js?render=explicit` loads and the widget appears in the reserved space. Submit the form → succeeds exactly as before. Also submit right after focusing (autofill) → the request waits for the token and still succeeds.
 10. **Turnstile — rejection, REST path:** `curl -s -X POST '<site>/wp-json/lean-ctas/v1/subscribe' -H 'Content-Type: application/json' -d '{"email":"test@example.com","list_uuid":"<configured uuid>"}'` (no `cf_turnstile_response`) → expect HTTP 400, `{"code":"captcha_failed",...}`. Confirm nothing was created in Listmonk.
 11. **Turnstile — rejection, no-JS path:** `curl -s -i -X POST '<site>/wp-admin/admin-post.php' -d 'action=lc_subscribe&lc_email=test@example.com&lc_list=<configured uuid>'` (no captcha field) → expect a 302 redirect to `?lc_done=err`. Confirm nothing was created in Listmonk.
 12. Set only one of the two keys → confirm the form renders and submits with no captcha shown (fail-open on "not configured").

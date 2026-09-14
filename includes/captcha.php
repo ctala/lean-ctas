@@ -62,9 +62,10 @@ function is_configured(): bool {
 }
 
 /**
- * Render the Turnstile widget div. Cloudflare's api.js scans the DOM for
- * `.cf-turnstile` and auto-injects the hidden `cf-turnstile-response` input
- * inside it — no manual wiring needed for the no-JS-enhanced (plain POST) path.
+ * Render the Turnstile widget container. Since 2.7.1 it stays empty until the
+ * visitor interacts with the form: the opt-in JS in frontend.php loads api.js
+ * and calls `turnstile.render()` on it, which injects the hidden
+ * `cf-turnstile-response` input inside it (also used by the plain POST fallback).
  *
  * Returns '' when not configured, so callers can unconditionally echo it.
  */
@@ -81,20 +82,22 @@ function widget_html(): string {
     // backend —que falla cerrado— rechaza altas legítimas. Verificado el 14-ago-2026:
     // 30s sin token y HTTP 400 en un envío real. Preferimos un widget visible
     // antes que perder suscriptores.
+    //
+    // min-height reserves the "normal" widget height (65px) up front: the widget
+    // is rendered after the first interaction, and without the reservation it
+    // would push the form down while the visitor is using it (CLS).
     return '<div class="cf-turnstile" data-sitekey="' . esc_attr( $settings['captcha_site_key'] )
-        . '" data-theme="auto"></div>';
+        . '" data-theme="auto" style="min-height:65px"></div>';
 }
 
 /**
- * <script> tag for Turnstile's API. Only print when an opt-in form that
- * needs it is on the page (caller decides when — see frontend.php).
+ * URL of Turnstile's API script, or '' when not configured. Deliberately not a
+ * <script> tag: loading it with the page ran the challenge for every visitor
+ * (INP regression, see CHANGELOG 2.7.1). frontend.php injects it with
+ * `?render=explicit` on the first interaction with an opt-in form.
  */
-function script_tag(): string {
-    if ( ! is_configured() ) {
-        return '';
-    }
-
-    return '<script src="' . esc_url( WIDGET_JS ) . '" async defer></script>';
+function script_src(): string {
+    return is_configured() ? WIDGET_JS : '';
 }
 
 /**

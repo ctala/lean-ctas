@@ -16,9 +16,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 use function LeanCTAs\Helpers\get_plugin_settings;
-use function LeanCTAs\Captcha\is_configured as captcha_is_configured;
 use function LeanCTAs\Captcha\widget_html as captcha_widget_html;
-use function LeanCTAs\Captcha\script_tag as captcha_script_tag;
+use function LeanCTAs\Captcha\script_src as captcha_script_src;
 
 // Priority 1001: must run AFTER leanautolinks (priority 999) which replaces
 // content with its pre-cached version. Running before it would lose the CTA.
@@ -415,22 +414,62 @@ function print_styles(): void {
     </style>
     <script>document.addEventListener('DOMContentLoaded',function(){var b=getComputedStyle(document.body).backgroundColor,m=b.match(/\d+/g);if(m&&m.length>=3){var l=(.299*m[0]+.587*m[1]+.114*m[2]);if(l<128)document.querySelectorAll('.lean-cta-block').forEach(function(e){e.classList.add('lean-cta-dark')})}})</script>
     <?php
-    // Turnstile: only loaded when configured (see Captcha\is_configured()) — no
-    // request to challenges.cloudflare.com happens on installs without keys.
-    if ( $has_optin && captcha_is_configured() ) {
-        echo captcha_script_tag(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- own trusted markup, no user input.
-    }
-    ?>
-
-    <?php
     // Progressive-enhancement JS for optin forms — only injected when needed.
     // Intercepts submit, posts to REST, swaps form for success message without reload.
     // Falls back to normal POST if JS is disabled or fetch fails.
+    //
+    // Turnstile (when configured) is NOT loaded with the page. Up to 2.7.0 api.js
+    // rendered every widget on load, so the challenge ran on every page view; on
+    // Android the cross-origin iframe shares the page's main thread and any tap
+    // waited behind it (Search Console INP > 200 ms, Sep 2026). api.js is now
+    // injected on the first pointerdown/focus inside an opt-in form, and submit
+    // waits for that form's token. No request to challenges.cloudflare.com
+    // happens until then (or ever, on installs without keys).
     if ( $has_optin ) :
     ?>
     <script>
     (function(){
-    var U=<?php echo wp_json_encode( $rest_url ); ?>;
+    var U=<?php echo wp_json_encode( $rest_url ); ?>,
+        TS=<?php echo wp_json_encode( captcha_script_src() ); ?>,
+        tsP=null;
+    function tsLoad(){
+        if(!tsP)tsP=new Promise(function(ok,ko){
+            window.leanCtasTurnstileLoaded=function(){ok(window.turnstile)};
+            var s=document.createElement('script');
+            s.src=TS+'?render=explicit&onload=leanCtasTurnstileLoaded';
+            s.onerror=function(){tsP=null;ko()};
+            document.head.appendChild(s);
+        });
+        return tsP;
+    }
+    // Per-form widget state: id once rendered, latest token, submits waiting for one.
+    function ts(f){return f._lcTs||(f._lcTs={id:null,busy:false,tok:'',wait:[]})}
+    function arm(f){
+        var st=ts(f),box=f.querySelector('.cf-turnstile');
+        if(!TS||!box||st.id!==null||st.busy)return;
+        st.busy=true;
+        tsLoad().then(function(t){
+            st.id=t.render(box,{sitekey:box.getAttribute('data-sitekey'),theme:box.getAttribute('data-theme')||'auto',
+                callback:function(k){st.tok=k;var w=st.wait;st.wait=[];w.forEach(function(r){r(k)})},
+                'expired-callback':function(){st.tok=''}});
+        },function(){st.busy=false});
+    }
+    // Resolves with the form's token ('' when Turnstile isn't configured); rejects after 20 s.
+    function token(f){
+        var st=ts(f);
+        if(!TS||!f.querySelector('.cf-turnstile'))return Promise.resolve('');
+        if(st.tok)return Promise.resolve(st.tok);
+        arm(f);
+        return new Promise(function(ok,ko){st.wait.push(ok);setTimeout(ko,20000)});
+    }
+    function intent(e){var f=e.target.closest&&e.target.closest('.lean-cta-optin-form');if(f)arm(f)}
+    if(TS){document.addEventListener('pointerdown',intent,{passive:true});document.addEventListener('focusin',intent)}
+    function fail(f,btn){
+        btn.disabled=false;var err=f.querySelector('.lean-cta-optin-error');
+        if(err)err.style.display='';else{var p=document.createElement('p');
+        p.className='lean-cta-optin-error';p.setAttribute('role','alert');
+        p.textContent='Something went wrong. Please try again.';f.appendChild(p);}
+    }
     document.addEventListener('submit',function(e){
         var f=e.target;
         if(!f.classList.contains('lean-cta-optin-form'))return;
@@ -439,26 +478,23 @@ function print_styles(): void {
         if(!em||!em.value)return;
         var L=f.dataset.list,sec=f.querySelector('[name=lc_secondary]');
         if(sec&&sec.checked)L+=','+sec.value;
-        // Turnstile (when configured) injects this hidden field itself; '' when absent.
-        var cf=f.querySelector('[name="cf-turnstile-response"]');
         btn.disabled=true;
-        fetch(U,{method:'POST',headers:{'Content-Type':'application/json'},
-            body:JSON.stringify({email:em.value,list_uuid:L,hp:'',page_url:location.href,
-                cf_turnstile_response:cf?cf.value:''})})
-        .then(function(r){return r.json()})
-        .then(function(d){
-            var s=f.closest('.lean-cta-optin-state');
-            if(d.success&&s){s.innerHTML='<p class="lean-cta-optin-success" role="status">'+
-                (f.dataset.success||'Check your email to confirm.')+
-            '</p>';
-            // Notify listeners (e.g. the sitewide popup auto-closes on this).
-            document.dispatchEvent(new CustomEvent('leanctas:subscribed',{detail:{list:f.dataset.list}}));
-            }else{btn.disabled=false;var err=f.querySelector('.lean-cta-optin-error');
-            if(err)err.style.display='';else{var p=document.createElement('p');
-            p.className='lean-cta-optin-error';p.setAttribute('role','alert');
-            p.textContent='Something went wrong. Please try again.';f.appendChild(p);}}
-        })
-        .catch(function(){btn.disabled=false;f.submit()});
+        token(f).then(function(cf){
+            fetch(U,{method:'POST',headers:{'Content-Type':'application/json'},
+                body:JSON.stringify({email:em.value,list_uuid:L,hp:'',page_url:location.href,
+                    cf_turnstile_response:cf})})
+            .then(function(r){return r.json()})
+            .then(function(d){
+                var s=f.closest('.lean-cta-optin-state');
+                if(d.success&&s){s.innerHTML='<p class="lean-cta-optin-success" role="status">'+
+                    (f.dataset.success||'Check your email to confirm.')+
+                '</p>';
+                // Notify listeners (e.g. the sitewide popup auto-closes on this).
+                document.dispatchEvent(new CustomEvent('leanctas:subscribed',{detail:{list:f.dataset.list}}));
+                }else{fail(f,btn)}
+            })
+            .catch(function(){btn.disabled=false;f.submit()});
+        },function(){fail(f,btn)});
     });
     })();
     </script>
